@@ -9,36 +9,29 @@ import java.util.*;
 
 public class CatalogManager {
 
-    private static final String CATALOG_PATH = "app/catalog.yml";
+    private static final String CATALOG_RESOURCE = "catalog.yml"; // Файл має лежати в src/main/resources/
 
+    // 🔹 Завантаження YAML з resources
     public static Map<String, Object> loadCatalog() {
         Yaml yaml = new Yaml();
-        try (InputStream in = new FileInputStream(CATALOG_PATH);
-             InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+        try (InputStream in = CatalogManager.class.getClassLoader().getResourceAsStream(CATALOG_RESOURCE);
+             InputStreamReader reader = new InputStreamReader(Objects.requireNonNull(in), StandardCharsets.UTF_8)) {
+
             Object loaded = yaml.load(reader);
             if (loaded instanceof Map) {
                 return (Map<String, Object>) loaded;
             }
-        } catch (FileNotFoundException e) {
-            System.out.println("[YAML] Файл catalog.yml не знайдений: " + CATALOG_PATH);
+        } catch (NullPointerException e) {
+            System.out.println("[YAML] Файл catalog.yml не знайдений у resources!");
         } catch (Exception e) {
             e.printStackTrace();
         }
         return new LinkedHashMap<>();
     }
 
+    // 🔹 Збереження YAML (тільки якщо реально хочеш перезаписувати ресурс)
     public static void saveCatalog(Map<String, Object> data) {
-        DumperOptions options = new DumperOptions();
-        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-        options.setPrettyFlow(true);
-        options.setAllowUnicode(true);
-
-        Yaml yaml = new Yaml(options);
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(CATALOG_PATH), StandardCharsets.UTF_8)) {
-            yaml.dump(data, writer);
-            System.out.println("[YAML] Каталог збережено: " + CATALOG_PATH);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        // На Railway/в resources зазвичай не можна записувати, тому тут можна просто виводити або робити backup у зовнішній файл
+        System.out.println("[YAML] Збереження каталогу в ресурсах неможливе. Для редагування треба робити зовнішній файл.");
     }
 }

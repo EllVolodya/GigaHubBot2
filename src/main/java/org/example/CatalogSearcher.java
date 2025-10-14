@@ -7,7 +7,7 @@ public class CatalogSearcher {
     private final Map<String, Object> catalogData;
 
     public CatalogSearcher() {
-        this.catalogData = CatalogManager.loadCatalog();
+        this.catalogData = CatalogManager.loadCatalog(); // Читаємо файл з resources
         System.out.println("✅ Catalog loaded: keys = " + catalogData.keySet());
     }
 
@@ -17,12 +17,15 @@ public class CatalogSearcher {
         return products != null ? products : new ArrayList<>();
     }
 
+    // ---------------- Пошук по ключовим словам ----------------
     public List<Map<String, Object>> searchByKeywordsAdmin(String keywords) {
         List<Map<String, Object>> results = new ArrayList<>();
         if (keywords == null || keywords.isEmpty()) return results;
 
         String[] parts = keywords.toLowerCase().split("\\s+");
-        for (Map<String, Object> product : getFlatProducts()) {
+        List<Map<String, Object>> products = getFlatProducts();
+
+        for (Map<String, Object> product : products) {
             String name = Objects.toString(product.get("name"), "").toLowerCase();
             boolean allMatch = Arrays.stream(parts).allMatch(name::contains);
             if (allMatch) results.add(product);
@@ -30,7 +33,7 @@ public class CatalogSearcher {
         return results;
     }
 
-    // ---------------- Пошук продуктів у catalog ----------------
+    // ---------------- Пошук продуктів у всьому catalog ----------------
     public List<Map<String, Object>> findProductsByName(String name) {
         List<Map<String, Object>> found = new ArrayList<>();
         if (name == null || name.trim().isEmpty()) return found;
@@ -47,9 +50,7 @@ public class CatalogSearcher {
 
         for (Map<String, Object> product : allProducts) {
             String productName = Objects.toString(product.get("name"), "");
-            if (productName.toLowerCase().contains(query)) {
-                found.add(product);
-            }
+            if (productName.toLowerCase().contains(query)) found.add(product);
         }
         return found;
     }
@@ -119,7 +120,6 @@ public class CatalogSearcher {
                             if (Objects.equals(subgroup.get("name"), subcategoryName)) {
                                 List<Map<String, Object>> products = (List<Map<String, Object>>) subgroup.get("products");
                                 if (products != null) return products;
-                                else return new ArrayList<>();
                             }
                         }
                     }
