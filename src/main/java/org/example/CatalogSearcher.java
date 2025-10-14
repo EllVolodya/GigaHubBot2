@@ -11,7 +11,12 @@ public class CatalogSearcher {
         System.out.println("✅ Catalog loaded: keys = " + catalogData.keySet());
     }
 
-    // --- Пошук товарів для адміна
+    // ---------------- Плоский список продуктів ----------------
+    public List<Map<String, Object>> getFlatProducts() {
+        List<Map<String, Object>> products = (List<Map<String, Object>>) catalogData.get("products");
+        return products != null ? products : new ArrayList<>();
+    }
+
     public List<Map<String, Object>> searchByKeywordsAdmin(String keywords) {
         List<Map<String, Object>> results = new ArrayList<>();
         if (keywords == null || keywords.isEmpty()) return results;
@@ -24,17 +29,10 @@ public class CatalogSearcher {
             boolean allMatch = Arrays.stream(parts).allMatch(name::contains);
             if (allMatch) results.add(product);
         }
-
         return results;
     }
 
-    // --- Плоский список продуктів
-    public List<Map<String, Object>> getFlatProducts() {
-        List<Map<String, Object>> products = (List<Map<String, Object>>) catalogData.get("products");
-        return products != null ? products : new ArrayList<>();
-    }
-
-    // --- Пошук за назвою
+    // ---------------- Пошук продуктів у catalog ----------------
     public List<Map<String, Object>> findProductsByName(String name) {
         List<Map<String, Object>> found = new ArrayList<>();
         if (name == null || name.trim().isEmpty()) return found;
@@ -55,11 +53,10 @@ public class CatalogSearcher {
                 found.add(product);
             }
         }
-
         return found;
     }
 
-    // --- Рекурсивний пошук (public)
+    // ---------------- Рекурсивний пошук ----------------
     public void extractProductsFromCatalogForSearch(List<Map<String, Object>> groups,
                                                     List<Map<String, Object>> foundProducts,
                                                     String query) {
@@ -83,7 +80,7 @@ public class CatalogSearcher {
         }
     }
 
-    // --- Повертає всі категорії
+    // ---------------- Категорії ----------------
     public List<String> getCategories() {
         List<String> categories = new ArrayList<>();
         List<Map<String, Object>> catalog = (List<Map<String, Object>>) catalogData.get("catalog");
@@ -95,7 +92,6 @@ public class CatalogSearcher {
         return categories;
     }
 
-    // --- Повертає підкатегорії
     public List<String> getSubcategories(String categoryName) {
         List<String> subcategories = new ArrayList<>();
         List<Map<String, Object>> catalog = (List<Map<String, Object>>) catalogData.get("catalog");
@@ -114,7 +110,6 @@ public class CatalogSearcher {
         return subcategories;
     }
 
-    // --- Повертає товари з підкатегорії
     public List<Map<String, Object>> getProducts(String categoryName, String subcategoryName) {
         List<Map<String, Object>> catalog = (List<Map<String, Object>>) catalogData.get("catalog");
         if (catalog != null) {
@@ -125,12 +120,8 @@ public class CatalogSearcher {
                         for (Map<String, Object> subgroup : subgroups) {
                             if (Objects.equals(subgroup.get("name"), subcategoryName)) {
                                 List<Map<String, Object>> products = (List<Map<String, Object>>) subgroup.get("products");
-                                if (products != null) {
-                                    for (Map<String, Object> p : products) {
-                                        p.putIfAbsent("photo", "");
-                                    }
-                                    return products;
-                                } else return new ArrayList<>();
+                                if (products != null) return products;
+                                else return new ArrayList<>();
                             }
                         }
                     }
@@ -140,7 +131,6 @@ public class CatalogSearcher {
         return new ArrayList<>();
     }
 
-    // --- Повертає весь catalog (плоский)
     public List<Map<String, Object>> getCatalog() {
         if (catalogData.containsKey("catalog")) {
             return (List<Map<String, Object>>) catalogData.get("catalog");

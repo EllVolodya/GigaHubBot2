@@ -9,7 +9,7 @@ import java.util.*;
 
 public class CatalogManager {
 
-    private static final String CATALOG_PATH = "app/catalog.yml"; // ваш шлях до файлу
+    private static final String CATALOG_PATH = "app/catalog.yml"; // або "/app/catalog.yml" для Linux
 
     // 🔹 Завантаження YAML
     public static Map<String, Object> loadCatalog() {
