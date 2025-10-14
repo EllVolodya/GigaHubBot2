@@ -171,52 +171,79 @@ public class CatalogEditor {
         return catalog.stream().anyMatch(cat -> categoryName.equalsIgnoreCase(Objects.toString(cat.get("name"), "")));
     }
 
-    // --- Додавання продукту в підкатегорію ---
+    // --- Додавання продукту з "products" у підкатегорію ---
     public static boolean addProductToSubcategory(String productName, String subcategoryName) {
         Map<String, Object> data = loadCatalog();
-        if (!data.containsKey("catalog")) return false;
+        if (data == null || !data.containsKey("catalog")) {
+            System.out.println("[YAML] ❌ Файл каталогу не містить ключ 'catalog'");
+            return false;
+        }
 
+        // 1️⃣ Шукаємо товар у секції "products"
         Map<String, Object> foundProduct = null;
-
         if (data.containsKey("products")) {
-            List<Map<String, Object>> rootProducts = (List<Map<String, Object>>) data.get("products");
-            for (Map<String, Object> p : rootProducts) {
-                if (Objects.toString(p.get("name"), "").equalsIgnoreCase(productName)) {
+            List<Map<String, Object>> allProducts = (List<Map<String, Object>>) data.get("products");
+            for (Map<String, Object> p : allProducts) {
+                String name = Objects.toString(p.get("name"), "").trim();
+                if (name.equalsIgnoreCase(productName.trim())) {
                     foundProduct = p;
                     break;
                 }
             }
         }
 
-        if (foundProduct == null) return false;
+        if (foundProduct == null) {
+            System.out.println("[YAML] ❌ Товар '" + productName + "' не знайдено у секції 'products'");
+            return false;
+        }
 
+        // 2️⃣ Створюємо копію товару, щоб не змінювати оригінал
         Map<String, Object> productCopy = new LinkedHashMap<>(foundProduct);
+        productCopy.putIfAbsent("unit", "шт");
         productCopy.putIfAbsent("description", "");
         productCopy.putIfAbsent("photo", "");
+        productCopy.putIfAbsent("manufacturer", "");
 
+        // 3️⃣ Шукаємо підкатегорію у "catalog"
         List<Map<String, Object>> categories = (List<Map<String, Object>>) data.get("catalog");
         for (Map<String, Object> category : categories) {
             List<Map<String, Object>> subgroups = (List<Map<String, Object>>) category.get("subgroups");
             if (subgroups == null) continue;
 
             for (Map<String, Object> subgroup : subgroups) {
-                if (Objects.toString(subgroup.get("name"), "").equalsIgnoreCase(subcategoryName)) {
-                    List<Map<String, Object>> products = (List<Map<String, Object>>) subgroup.get("products");
-                    if (products == null) {
-                        products = new ArrayList<>();
-                        subgroup.put("products", products);
+                String subName = Objects.toString(subgroup.get("name"), "").trim();
+                if (subName.equalsIgnoreCase(subcategoryName.trim())) {
+
+                    List<Map<String, Object>> subgroupProducts =
+                            (List<Map<String, Object>>) subgroup.get("products");
+                    if (subgroupProducts == null) {
+                        subgroupProducts = new ArrayList<>();
+                        subgroup.put("products", subgroupProducts);
                     }
 
-                    boolean exists = products.stream()
-                            .anyMatch(p -> Objects.toString(p.get("name"), "").equalsIgnoreCase(productName));
-                    if (!exists) {
-                        products.add(productCopy);
-                        saveCatalog(data);
-                        return true;
+                    // 4️⃣ Перевіряємо, щоб не було дублікатів
+                    boolean exists = subgroupProducts.stream()
+                            .anyMatch(p -> Objects.toString(p.get("name"), "")
+                                    .equalsIgnoreCase(productName.trim()));
+
+                    if (exists) {
+                        System.out.println("[YAML] ⚠ Товар '" + productName +
+                                "' уже є у підкатегорії '" + subcategoryName + "'");
+                        return false;
                     }
+
+                    // 5️⃣ Додаємо товар у підкатегорію
+                    subgroupProducts.add(productCopy);
+                    saveCatalog(data);
+
+                    System.out.println("[YAML] ✅ Товар '" + productName +
+                            "' додано у підкатегорію '" + subcategoryName + "'");
+                    return true;
                 }
             }
         }
+
+        System.out.println("[YAML] ❌ Підкатегорію '" + subcategoryName + "' не знайдено");
         return false;
     }
 
