@@ -32583,7 +32583,7 @@ catalog:
         ✅ Швидке твердіння (R). Швидко набирає міцність, що дозволяє прискорити темпи будівництва і швидше продовжувати роботу.
         ✅ Універсальність. Завдяки спеціальним добавкам (CEM II/A-S) має чудову пластичність та стійкість до зовнішніх впливів.
         ✅ Зручний формат. Упаковка по 25 кг — легко транспортувати та працювати.
-      photo: images/AgACAgIAAxkBAAIfeGjfy32Iw_y78XmyiJkIk9NjTnVkAAJZ_TEbjRj4SrBw6fHbOSH2AQADAgADeQADNgQ.jpg
+      photo: src/main/resources/images/AgACAgIAAxkBAAIfeGjfy32Iw_y78XmyiJkIk9NjTnVkAAJZ_TEbjRj4SrBw6fHbOSH2AQADAgADeQADNgQ.jpg
       unit: шт
     - name: ЦПС-Профіт (цемент.пісчана суміш) 25кг
       price: '140'
