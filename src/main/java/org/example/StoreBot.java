@@ -776,12 +776,12 @@ public class StoreBot extends TelegramLongPollingBot {
 
         // Відправлення товару
         if (photoPath != null && !photoPath.isEmpty()) {
-            // Відносний шлях до ресурсу в src/main/resources/images/
-            String resourcePath = "images/" + photoPath;
+            // Беремо тільки ім’я файлу з повного шляху (як у YAML)
+            String fileName = new java.io.File(photoPath).getName();
 
-            sendPhoto(chatId.toString(), resourcePath, sb.toString(), markup);
+            sendPhoto(chatId.toString(), fileName, sb.toString());
         } else {
-            sendMessage(chatId, sb.toString(), markup);
+            sendText(chatId.toString(), sb.toString());
         }
 
         // Після показу товару збільшуємо індекс для наступного показу
@@ -2321,12 +2321,12 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setKeyboard(kb);
 
         if (photoPath != null && !photoPath.isEmpty()) {
-            // Відносний шлях до ресурсу в src/main/resources/images/
-            String resourcePath = "images/" + photoPath;
+            // Беремо тільки ім’я файлу з повного шляху (як у YAML)
+            String fileName = new java.io.File(photoPath).getName();
 
-            sendPhoto(chatId.toString(), resourcePath, sb.toString(), markup);
+            sendPhoto(chatId.toString(), fileName, sb.toString());
         } else {
-            sendMessage(chatId, sb.toString(), markup);
+            sendText(chatId.toString(), sb.toString());
         }
 
         // Збільшуємо індекс для наступного показу
@@ -2334,27 +2334,31 @@ public class StoreBot extends TelegramLongPollingBot {
         productIndex.put(chatId, index);
     }
 
-    private void sendPhoto(String chatId, String resourcePath, String caption, ReplyKeyboardMarkup markup) {
-        InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath);
-
-        if (is == null) {
-            sendMessage(chatId, caption, markup);
-            System.out.println("[PHOTO] Файл не знайдено: " + resourcePath);
-            return;
-        }
-
-        SendPhoto photo = new SendPhoto();
-        photo.setChatId(chatId);
-        photo.setPhoto(new InputFile(is, resourcePath));
-        photo.setCaption(caption);
-        photo.setReplyMarkup(markup);
-
+    private void sendPhoto(String chatId, String fileName, String caption) {
         try {
+            InputStream is = getClass().getClassLoader().getResourceAsStream("images/" + fileName);
+
+            if (is == null) {
+                System.out.println("[PHOTO] Файл не знайдено: " + fileName);
+                sendText(chatId, "❌ Фото не знайдено.");
+                return;
+            }
+
+            SendPhoto photo = new SendPhoto();
+            photo.setChatId(chatId);
+
+            // Створюємо InputFile з InputStream
+            InputFile inputFile = new InputFile(is, fileName);
+            photo.setPhoto(inputFile);
+
+            photo.setCaption(caption);
+
             execute(photo);
-            System.out.println("[PHOTO] Фото успішно надіслано: " + resourcePath);
-        } catch (TelegramApiException e) {
+            System.out.println("[PHOTO] Фото успішно надіслано: " + fileName);
+
+        } catch (Exception e) {
             e.printStackTrace();
-            System.out.println("[PHOTO] Помилка при відправці фото: " + e.getMessage());
+            sendText(chatId, "❌ Сталася помилка при відправці фото.");
         }
     }
 
@@ -2534,12 +2538,12 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setKeyboard(kb);
 
         if (photoPath != null && !photoPath.isEmpty()) {
-            // Відносний шлях всередині resources/images/
-            String resourcePath = "images/" + photoPath;
+            // Беремо тільки ім’я файлу з повного шляху (як у YAML)
+            String fileName = new java.io.File(photoPath).getName();
 
-            sendPhoto(chatId.toString(), resourcePath, sb.toString(), markup);
+            sendPhoto(chatId.toString(), fileName, sb.toString());
         } else {
-            sendMessage(chatId, sb.toString(), markup);
+            sendText(chatId.toString(), sb.toString());
         }
 
         // Показуємо наступний товар
