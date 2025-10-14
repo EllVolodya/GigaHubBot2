@@ -1883,28 +1883,28 @@ public class StoreBot extends TelegramLongPollingBot {
             org.telegram.telegrambots.meta.api.methods.GetFile getFileMethod = new GetFile(fileId);
             org.telegram.telegrambots.meta.api.objects.File file = execute(getFileMethod);
 
-            // Створюємо каталог images, якщо її нема
-            java.io.File dir = new java.io.File("images");
+            // Створюємо каталог src/main/resources/images, якщо його нема
+            java.io.File dir = new java.io.File("src/main/resources/images");
             if (!dir.exists()) dir.mkdirs();
 
-            // Зберігаємо файл з назвою fileId.jpg
-            String filePath = "images/" + fileId + ".jpg";
+            // Зберігаємо файл з fileId.jpg у resources/images
+            String filePath = "src/main/resources/images/" + fileId + ".jpg";
             java.io.File localFile = new java.io.File(filePath);
 
-            InputStream is = new URL(file.getFileUrl(getBotToken())).openStream();
-            try (FileOutputStream fos = new FileOutputStream(localFile)) {
+            try (InputStream is = new URL(file.getFileUrl(getBotToken())).openStream();
+                 FileOutputStream fos = new FileOutputStream(localFile)) {
                 byte[] buffer = new byte[4096];
                 int read;
                 while ((read = is.read(buffer)) != -1) {
                     fos.write(buffer, 0, read);
                 }
             }
-            is.close();
 
             System.out.println("[PHOTO] Фото успішно збережено: " + localFile.getAbsolutePath());
 
-            // Оновлюємо поле photo у YAML
-            CatalogEditor.updateField(productName, "photo", filePath);
+            // Оновлюємо поле photo у YAML з відносним шляхом для JAR
+            String relativePath = "images/" + fileId + ".jpg";
+            CatalogEditor.updateField(productName, "photo", relativePath);
 
             sendText(chatId, "✅ Фото успішно додано до товару '" + productName + "'.");
 
