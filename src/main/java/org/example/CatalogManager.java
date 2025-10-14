@@ -9,9 +9,8 @@ import java.util.*;
 
 public class CatalogManager {
 
-    private static final String CATALOG_PATH = "app/catalog.yml"; // або "/app/catalog.yml" для Linux
+    private static final String CATALOG_PATH = "app/catalog.yml";
 
-    // 🔹 Завантаження YAML
     public static Map<String, Object> loadCatalog() {
         Yaml yaml = new Yaml();
         try (InputStream in = new FileInputStream(CATALOG_PATH);
@@ -28,7 +27,6 @@ public class CatalogManager {
         return new LinkedHashMap<>();
     }
 
-    // 🔹 Збереження YAML
     public static void saveCatalog(Map<String, Object> data) {
         DumperOptions options = new DumperOptions();
         options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);

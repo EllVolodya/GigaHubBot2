@@ -22,9 +22,7 @@ public class CatalogSearcher {
         if (keywords == null || keywords.isEmpty()) return results;
 
         String[] parts = keywords.toLowerCase().split("\\s+");
-        List<Map<String, Object>> products = getFlatProducts();
-
-        for (Map<String, Object> product : products) {
+        for (Map<String, Object> product : getFlatProducts()) {
             String name = Objects.toString(product.get("name"), "").toLowerCase();
             boolean allMatch = Arrays.stream(parts).allMatch(name::contains);
             if (allMatch) results.add(product);
