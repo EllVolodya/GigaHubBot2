@@ -774,7 +774,6 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setResizeKeyboard(true);
         markup.setKeyboard(kb);
 
-        // Відправлення товару
         if (photoPath != null && !photoPath.isEmpty()) {
             // Беремо тільки ім’я файлу з повного шляху (як у YAML)
             String fileName = new java.io.File(photoPath).getName();
