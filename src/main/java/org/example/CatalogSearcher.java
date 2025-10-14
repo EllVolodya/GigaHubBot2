@@ -1,14 +1,11 @@
 package org.example;
 
 import org.yaml.snakeyaml.Yaml;
-
 import java.io.InputStream;
-import java.io.FileInputStream;
 import java.util.*;
 
 public class CatalogSearcher {
 
-    private static final String CATALOG_PATH = "/app/catalog.yml"; // ✅ файл у Railway app
     private final Map<String, Object> catalogData;
 
     public CatalogSearcher() {
@@ -16,10 +13,13 @@ public class CatalogSearcher {
         System.out.println("✅ Catalog loaded: keys = " + catalogData.keySet());
     }
 
-    // 🔹 Завантажує catalog.yml з /app
+    // 🔹 Завантажує catalog.yml з resources (працює і на Railway)
     private Map<String, Object> loadCatalog() {
         Yaml yaml = new Yaml();
-        try (InputStream input = new FileInputStream(CATALOG_PATH)) {
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream("catalog.yml")) {
+            if (input == null) {
+                throw new IllegalStateException("Файл catalog.yml не знайдений у resources!");
+            }
             Object loaded = yaml.load(input);
             if (loaded instanceof Map) {
                 return (Map<String, Object>) loaded;
@@ -27,7 +27,7 @@ public class CatalogSearcher {
                 return new HashMap<>();
             }
         } catch (Exception e) {
-            throw new IllegalStateException("❌ catalog.yml не знайдений за шляхом: " + CATALOG_PATH, e);
+            throw new IllegalStateException("Помилка при завантаженні catalog.yml", e);
         }
     }
 
