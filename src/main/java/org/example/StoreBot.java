@@ -776,10 +776,13 @@ public class StoreBot extends TelegramLongPollingBot {
 
         // Відправлення товару
         if (photoPath != null && !photoPath.isEmpty()) {
-            java.io.File file = new java.io.File(photoPath);
-            if (file.exists()) sendPhoto(chatId.toString(), file, sb.toString(), markup);
-            else sendMessage(chatId, sb.toString(), markup);
-        } else sendMessage(chatId, sb.toString(), markup);
+            // Відносний шлях до ресурсу в src/main/resources/images/
+            String resourcePath = "images/" + photoPath;
+
+            sendPhoto(chatId.toString(), resourcePath, sb.toString(), markup);
+        } else {
+            sendMessage(chatId, sb.toString(), markup);
+        }
 
         // Після показу товару збільшуємо індекс для наступного показу
         index++;
@@ -2318,26 +2321,37 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setKeyboard(kb);
 
         if (photoPath != null && !photoPath.isEmpty()) {
-            java.io.File file = new java.io.File(photoPath);
-            if (file.exists()) sendPhoto(chatId.toString(), file, sb.toString(), markup);
-            else sendMessage(chatId, sb.toString(), markup);
-        } else sendMessage(chatId, sb.toString(), markup);
+            // Відносний шлях до ресурсу в src/main/resources/images/
+            String resourcePath = "images/" + photoPath;
+
+            sendPhoto(chatId.toString(), resourcePath, sb.toString(), markup);
+        } else {
+            sendMessage(chatId, sb.toString(), markup);
+        }
 
         // Збільшуємо індекс для наступного показу
         index = (index + 1) % products.size();
         productIndex.put(chatId, index);
     }
 
-    private void sendPhoto(String chatId, java.io.File file, String caption, ReplyKeyboardMarkup markup) {
+    private void sendPhoto(String chatId, String resourcePath, String caption, ReplyKeyboardMarkup markup) {
+        InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath);
+
+        if (is == null) {
+            sendMessage(chatId, caption, markup);
+            System.out.println("[PHOTO] Файл не знайдено: " + resourcePath);
+            return;
+        }
+
         SendPhoto photo = new SendPhoto();
         photo.setChatId(chatId);
-        photo.setPhoto(new InputFile(file));
+        photo.setPhoto(new InputFile(is, resourcePath));
         photo.setCaption(caption);
         photo.setReplyMarkup(markup);
 
         try {
-            execute(photo); // метод execute є у TelegramLongPollingBot
-            System.out.println("[PHOTO] Фото успішно надіслано: " + file.getName());
+            execute(photo);
+            System.out.println("[PHOTO] Фото успішно надіслано: " + resourcePath);
         } catch (TelegramApiException e) {
             e.printStackTrace();
             System.out.println("[PHOTO] Помилка при відправці фото: " + e.getMessage());
@@ -2519,8 +2533,11 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setResizeKeyboard(true);
         markup.setKeyboard(kb);
 
-        if (!photoPath.isEmpty() && new java.io.File(photoPath).exists()) {
-            sendPhoto(chatId.toString(), new java.io.File(photoPath), sb.toString(), markup);
+        if (photoPath != null && !photoPath.isEmpty()) {
+            // Відносний шлях всередині resources/images/
+            String resourcePath = "images/" + photoPath;
+
+            sendPhoto(chatId.toString(), resourcePath, sb.toString(), markup);
         } else {
             sendMessage(chatId, sb.toString(), markup);
         }

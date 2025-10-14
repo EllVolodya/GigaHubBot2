@@ -2,14 +2,14 @@ package org.example;
 
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.Constructor;
 
 import java.io.*;
 import java.util.HashSet;
 import java.util.Set;
 
 public class UserManager {
-    private static final String FILE_PATH = "src/main/resources/registered_users.yml";
+    // Безпечний шлях: створюємо папку data у корені проекту або контейнера
+    private static final String FILE_PATH = "data/registered_users.yml";
     private Set<Long> registeredUsers = new HashSet<>();
 
     public UserManager() {
@@ -22,7 +22,6 @@ public class UserManager {
         if (file.exists()) {
             try (InputStream input = new FileInputStream(file)) {
                 Yaml yaml = new Yaml();
-                // Використовуємо loadAs і Set.class
                 Set<?> loaded = yaml.loadAs(input, Set.class);
                 if (loaded != null) {
                     registeredUsers = new HashSet<>();
@@ -42,11 +41,17 @@ public class UserManager {
 
     // Збереження користувачів у YAML
     private void saveUsers() {
-        try (Writer writer = new FileWriter(FILE_PATH)) {
-            DumperOptions options = new DumperOptions();
-            options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-            Yaml yaml = new Yaml(options);
-            yaml.dump(registeredUsers, writer);
+        try {
+            File file = new File(FILE_PATH);
+            // Створюємо всі проміжні папки, якщо їх нема
+            file.getParentFile().mkdirs();
+
+            try (Writer writer = new FileWriter(file)) {
+                DumperOptions options = new DumperOptions();
+                options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+                Yaml yaml = new Yaml(options);
+                yaml.dump(registeredUsers, writer);
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
