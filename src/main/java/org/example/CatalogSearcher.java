@@ -1,7 +1,5 @@
 package org.example;
 
-import org.yaml.snakeyaml.Yaml;
-import java.io.InputStream;
 import java.util.*;
 
 public class CatalogSearcher {
@@ -9,29 +7,11 @@ public class CatalogSearcher {
     private final Map<String, Object> catalogData;
 
     public CatalogSearcher() {
-        this.catalogData = loadCatalog();
+        this.catalogData = CatalogManager.loadCatalog();
         System.out.println("✅ Catalog loaded: keys = " + catalogData.keySet());
     }
 
-    // 🔹 Завантажує catalog.yml з resources (працює і на Railway)
-    private Map<String, Object> loadCatalog() {
-        Yaml yaml = new Yaml();
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream("catalog.yml")) {
-            if (input == null) {
-                throw new IllegalStateException("Файл catalog.yml не знайдений у resources!");
-            }
-            Object loaded = yaml.load(input);
-            if (loaded instanceof Map) {
-                return (Map<String, Object>) loaded;
-            } else {
-                return new HashMap<>();
-            }
-        } catch (Exception e) {
-            throw new IllegalStateException("Помилка при завантаженні catalog.yml", e);
-        }
-    }
-
-    // 🔹 Пошук товарів для адмінки у плоскому списку "products:"
+    // --- Пошук товарів для адміна
     public List<Map<String, Object>> searchByKeywordsAdmin(String keywords) {
         List<Map<String, Object>> results = new ArrayList<>();
         if (keywords == null || keywords.isEmpty()) return results;
@@ -48,13 +28,13 @@ public class CatalogSearcher {
         return results;
     }
 
-    // 🔹 Повертає плоский список товарів
+    // --- Плоский список продуктів
     public List<Map<String, Object>> getFlatProducts() {
         List<Map<String, Object>> products = (List<Map<String, Object>>) catalogData.get("products");
         return products != null ? products : new ArrayList<>();
     }
 
-    // 🔹 Пошук товарів за назвою у всьому catalog
+    // --- Пошук за назвою
     public List<Map<String, Object>> findProductsByName(String name) {
         List<Map<String, Object>> found = new ArrayList<>();
         if (name == null || name.trim().isEmpty()) return found;
@@ -79,11 +59,10 @@ public class CatalogSearcher {
         return found;
     }
 
-    // 🔹 Public метод для рекурсивного пошуку товарів у catalog
-    public void extractProductsFromCatalogForSearch(
-            List<Map<String, Object>> groups,
-            List<Map<String, Object>> foundProducts,
-            String query) {
+    // --- Рекурсивний пошук (public)
+    public void extractProductsFromCatalogForSearch(List<Map<String, Object>> groups,
+                                                    List<Map<String, Object>> foundProducts,
+                                                    String query) {
         for (Map<String, Object> group : groups) {
             if (group.containsKey("products")) {
                 List<Map<String, Object>> products = (List<Map<String, Object>>) group.get("products");
@@ -104,7 +83,7 @@ public class CatalogSearcher {
         }
     }
 
-    // 🔹 Повертає список категорій
+    // --- Повертає всі категорії
     public List<String> getCategories() {
         List<String> categories = new ArrayList<>();
         List<Map<String, Object>> catalog = (List<Map<String, Object>>) catalogData.get("catalog");
@@ -116,7 +95,7 @@ public class CatalogSearcher {
         return categories;
     }
 
-    // 🔹 Повертає підкатегорії категорії
+    // --- Повертає підкатегорії
     public List<String> getSubcategories(String categoryName) {
         List<String> subcategories = new ArrayList<>();
         List<Map<String, Object>> catalog = (List<Map<String, Object>>) catalogData.get("catalog");
@@ -135,7 +114,7 @@ public class CatalogSearcher {
         return subcategories;
     }
 
-    // 🔹 Повертає товари з підкатегорії
+    // --- Повертає товари з підкатегорії
     public List<Map<String, Object>> getProducts(String categoryName, String subcategoryName) {
         List<Map<String, Object>> catalog = (List<Map<String, Object>>) catalogData.get("catalog");
         if (catalog != null) {
@@ -161,7 +140,7 @@ public class CatalogSearcher {
         return new ArrayList<>();
     }
 
-    // 🔹 Повертає весь catalog (плоский варіант)
+    // --- Повертає весь catalog (плоский)
     public List<Map<String, Object>> getCatalog() {
         if (catalogData.containsKey("catalog")) {
             return (List<Map<String, Object>>) catalogData.get("catalog");
