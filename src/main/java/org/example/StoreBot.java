@@ -775,9 +775,7 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setKeyboard(kb);
 
         if (photoPath != null && !photoPath.isEmpty()) {
-            // Беремо тільки ім’я файлу з повного шляху (як у YAML)
             String fileName = new java.io.File(photoPath).getName();
-
             sendPhotoFromResources(chatId.toString(), fileName, sb.toString(), markup);
         } else {
             sendText(chatId.toString(), sb.toString());
@@ -2320,10 +2318,7 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setKeyboard(kb);
 
         if (photoPath != null && !photoPath.isEmpty()) {
-            // Беремо тільки ім’я файлу з повного шляху (як у YAML)
             String fileName = new java.io.File(photoPath).getName();
-
-            // Відправляємо фото із resources (JAR)
             sendPhotoFromResources(chatId.toString(), fileName, sb.toString(), markup);
         } else {
             sendText(chatId.toString(), sb.toString());
@@ -2538,9 +2533,7 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setKeyboard(kb);
 
         if (photoPath != null && !photoPath.isEmpty()) {
-            // Беремо тільки ім’я файлу з повного шляху (як у YAML)
             String fileName = new java.io.File(photoPath).getName();
-
             sendPhotoFromResources(chatId.toString(), fileName, sb.toString(), markup);
         } else {
             sendText(chatId.toString(), sb.toString());
@@ -2623,40 +2616,35 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
-    private void sendPhotoFromResources(String chatId, String fileName, String caption, ReplyKeyboardMarkup markup) {
+    private void sendPhotoFromResources(String chatId, String resourceFileName, String caption, ReplyKeyboardMarkup markup) {
         try {
-            InputStream is = getClass().getClassLoader().getResourceAsStream("images/" + fileName);
+            // Відносний шлях у src/main/resources, наприклад "images/фото.jpg"
+            String resourcePath = "images/" + resourceFileName;
+            InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath);
+
             if (is == null) {
-                System.out.println("[PHOTO] Файл не знайдено: " + fileName);
-                sendText(chatId, "❌ Фото не знайдено для товару.");
+                System.out.println("[PHOTO] Фото не знайдено у ресурсах: " + resourcePath);
+                sendText(chatId, "❌ Фото не знайдено: " + resourceFileName);
                 return;
             }
 
+            InputFile inputFile = new InputFile(is, resourceFileName); // InputStream + назва файлу
+
             SendPhoto photo = new SendPhoto();
             photo.setChatId(chatId);
+            photo.setPhoto(inputFile);
             photo.setCaption(caption);
-            photo.setReplyMarkup(markup); // додаємо клавіатуру
+            photo.setReplyMarkup(markup);
 
-            // Зберігаємо тимчасовий файл, бо TelegramBot не приймає InputStream напряму
-            java.io.File tempFile = java.io.File.createTempFile("temp_photo", ".jpg");
-            try (FileOutputStream fos = new FileOutputStream(tempFile)) {
-                byte[] buffer = new byte[4096];
-                int read;
-                while ((read = is.read(buffer)) != -1) {
-                    fos.write(buffer, 0, read);
-                }
-            }
-            is.close();
-
-            photo.setPhoto(new InputFile(tempFile));
             execute(photo);
+            System.out.println("[PHOTO] Фото успішно надіслано: " + resourceFileName);
 
-            System.out.println("[PHOTO] Фото успішно надіслано: " + fileName);
-            tempFile.deleteOnExit();
+            // Закриваємо InputStream після відправки
+            is.close();
 
         } catch (Exception e) {
             e.printStackTrace();
-            sendText(chatId, "❌ Сталася помилка при відправці фото.");
+            sendText(chatId, "❌ Сталася помилка при відправленні фото.");
         }
     }
 
