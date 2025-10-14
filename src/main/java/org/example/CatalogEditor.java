@@ -9,100 +9,102 @@ import java.util.*;
 
 public class CatalogEditor {
 
-    // --- Зовнішній файл, куди будемо зберігати оновлення ---
-    private static final String EXTERNAL_CATALOG_PATH = "catalog.yml";
+    private static final String CATALOG_PATH = "/app/catalog.yml"; // Railway
 
-    // --- Завантажує YAML: спочатку перевіряємо зовнішній файл, якщо немає, беремо ресурс ---
+    // --- Завантажує YAML як Map ---
     public static Map<String, Object> loadCatalog() {
         Yaml yaml = new Yaml();
-        InputStream in = null;
-
-        // 1) Спроба зчитати зовнішній файл (створений після оновлень)
-        File externalFile = new File(EXTERNAL_CATALOG_PATH);
-        if (externalFile.exists()) {
-            try {
-                in = new FileInputStream(externalFile);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
-        }
-
-        // 2) Якщо зовнішнього файлу нема, беремо ресурс із JAR
-        if (in == null) {
-            in = CatalogEditor.class.getClassLoader().getResourceAsStream("catalog.yml");
-            if (in == null) {
-                System.err.println("[YAML] catalog.yml не знайдено!");
-                return new LinkedHashMap<>();
-            }
-        }
-
-        try (InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+        try (InputStream in = new FileInputStream(CATALOG_PATH);
+             InputStreamReader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
             Object loaded = yaml.load(reader);
-            if (loaded instanceof Map) {
-                return (Map<String, Object>) loaded;
-            }
+            if (loaded instanceof Map) return (Map<String, Object>) loaded;
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         return new LinkedHashMap<>();
     }
 
-    // --- Збереження каталогу у зовнішній файл ---
+    // --- Зберігає Map у YAML ---
     public static void saveCatalog(Map<String, Object> data) {
         DumperOptions options = new DumperOptions();
         options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
         options.setPrettyFlow(true);
         options.setAllowUnicode(true);
         Yaml yaml = new Yaml(options);
-
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(EXTERNAL_CATALOG_PATH), StandardCharsets.UTF_8)) {
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(CATALOG_PATH), StandardCharsets.UTF_8)) {
             yaml.dump(data, writer);
+            System.out.println("[YAML] Каталог збережено: " + CATALOG_PATH);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    // --- Повертає усі товари у плоскому списку (root products + категорії) ---
-    public static List<Map<String, Object>> loadCatalogListFlat() {
-        List<Map<String, Object>> products = new ArrayList<>();
+    // --- Перевірка чи існує категорія ---
+    public static boolean categoryExists(String categoryName) {
         Map<String, Object> data = loadCatalog();
-        if (data == null || data.isEmpty()) return products;
-
-        if (data.containsKey("products")) {
-            List<Map<String, Object>> rootProducts = (List<Map<String, Object>>) data.get("products");
-            if (rootProducts != null) products.addAll(rootProducts);
-        }
-
-        if (!data.containsKey("catalog")) return products;
+        if (!data.containsKey("catalog")) return false;
         List<Map<String, Object>> categories = (List<Map<String, Object>>) data.get("catalog");
-        if (categories == null) return products;
+        return categories.stream().anyMatch(c -> Objects.toString(c.get("name"), "").equalsIgnoreCase(categoryName));
+    }
 
+    // --- Додати категорію ---
+    public static boolean addCategory(String categoryName) {
+        Map<String, Object> data = loadCatalog();
+        List<Map<String, Object>> categories = (List<Map<String, Object>>) data.computeIfAbsent("catalog", k -> new ArrayList<>());
+
+        boolean exists = categories.stream().anyMatch(c -> Objects.toString(c.get("name"), "").equalsIgnoreCase(categoryName));
+        if (exists) return false;
+
+        Map<String, Object> newCategory = new LinkedHashMap<>();
+        newCategory.put("name", categoryName);
+        newCategory.put("subgroups", new ArrayList<>());
+        categories.add(newCategory);
+
+        saveCatalog(data);
+        return true;
+    }
+
+    // --- Додати підкатегорію ---
+    public static boolean addSubcategory(String categoryName, String subcategoryName) {
+        Map<String, Object> data = loadCatalog();
+        if (!data.containsKey("catalog")) return false;
+
+        List<Map<String, Object>> categories = (List<Map<String, Object>>) data.get("catalog");
         for (Map<String, Object> category : categories) {
-            List<Map<String, Object>> directProducts = (List<Map<String, Object>>) category.get("products");
-            if (directProducts != null) products.addAll(directProducts);
-
-            List<Map<String, Object>> subgroups = (List<Map<String, Object>>) category.get("subgroups");
-            if (subgroups != null) {
-                for (Map<String, Object> subgroup : subgroups) {
-                    List<Map<String, Object>> subgroupProducts = (List<Map<String, Object>>) subgroup.get("products");
-                    if (subgroupProducts != null) products.addAll(subgroupProducts);
+            if (Objects.toString(category.get("name"), "").equalsIgnoreCase(categoryName)) {
+                List<Map<String, Object>> subgroups = (List<Map<String, Object>>) category.computeIfAbsent("subgroups", k -> new ArrayList<>());
+                boolean exists = subgroups.stream().anyMatch(s -> Objects.toString(s.get("name"), "").equalsIgnoreCase(subcategoryName));
+                if (!exists) {
+                    Map<String, Object> newSub = new LinkedHashMap<>();
+                    newSub.put("name", subcategoryName);
+                    newSub.put("products", new ArrayList<>());
+                    subgroups.add(newSub);
+                    saveCatalog(data);
+                    return true;
                 }
             }
         }
-        return products;
+        return false;
     }
 
-    // --- Методи для редагування товару ---
+    // --- Видалити категорію ---
+    public static boolean deleteCategory(String categoryName) {
+        Map<String, Object> data = loadCatalog();
+        if (!data.containsKey("catalog")) return false;
+
+        List<Map<String, Object>> categories = (List<Map<String, Object>>) data.get("catalog");
+        boolean removed = categories.removeIf(c -> Objects.toString(c.get("name"), "").equalsIgnoreCase(categoryName));
+
+        if (removed) saveCatalog(data);
+        return removed;
+    }
+
+    // --- Оновити поле товару ---
     public static void updateField(String productName, String field, String newValue) {
         Map<String, Object> data = loadCatalog();
         boolean updated = false;
 
-        if (!data.containsKey("catalog")) {
-            System.out.println("[YAML] Каталог порожній або не знайдено ключ 'catalog'");
-            return;
-        }
-
+        if (!data.containsKey("catalog")) return;
         List<Map<String, Object>> categories = (List<Map<String, Object>>) data.get("catalog");
 
         for (Map<String, Object> category : categories) {
@@ -114,8 +116,8 @@ public class CatalogEditor {
                 if (products == null) continue;
 
                 for (Map<String, Object> product : products) {
-                    String yamlName = Objects.toString(product.get("name"), "").trim();
-                    if (yamlName.equalsIgnoreCase(productName.trim())) {
+                    String name = Objects.toString(product.get("name"), "").trim();
+                    if (name.equalsIgnoreCase(productName.trim())) {
                         product.put(field, newValue);
                         updated = true;
                         break;
@@ -129,205 +131,54 @@ public class CatalogEditor {
         if (updated) saveCatalog(data);
     }
 
-    public static void renameProduct(String oldName, String newName) {
-        updateField(oldName, "name", newName);
+    // --- Оновити виробника товару ---
+    public static boolean updateProductManufacturer(String productName, String manufacturerValue) {
+        updateField(productName, "manufacturer", manufacturerValue);
+        return true;
     }
 
-    public static void updatePrice(String productName, String newPrice) {
-        updateField(productName, "price", newPrice);
-    }
-
-    public static void updateDescription(String productName, String newDescription) {
-        updateField(productName, "description", newDescription);
-    }
-
-    // --- Додавання категорій/підкатегорій ---
-    public static void addCategory(String categoryName, String subcategoryName) {
-        Map<String, Object> data = loadCatalog();
-        List<Map<String, Object>> catalog = (List<Map<String, Object>>) data.get("catalog");
-        if (catalog == null) catalog = new ArrayList<>();
-
-        Map<String, Object> newCategory = new LinkedHashMap<>();
-        newCategory.put("name", categoryName);
-
-        List<Map<String, Object>> subgroups = new ArrayList<>();
-        Map<String, Object> sub = new LinkedHashMap<>();
-        sub.put("name", subcategoryName != null && !subcategoryName.isEmpty() ? subcategoryName : "Основна");
-        sub.put("products", new ArrayList<>());
-        subgroups.add(sub);
-
-        newCategory.put("subgroups", subgroups);
-        catalog.add(newCategory);
-        data.put("catalog", catalog);
-
-        saveCatalog(data);
-    }
-
-    public static boolean categoryExists(String categoryName) {
+    // --- Додати продукт у підкатегорію ---
+    public static boolean addProductToSubcategory(String productName, String subcategoryName) {
         Map<String, Object> data = loadCatalog();
         if (!data.containsKey("catalog")) return false;
 
-        List<Map<String, Object>> catalog = (List<Map<String, Object>>) data.get("catalog");
-        return catalog.stream().anyMatch(cat -> categoryName.equalsIgnoreCase(Objects.toString(cat.get("name"), "")));
-    }
-
-    // --- Додавання продукту з "products" у підкатегорію ---
-    public static boolean addProductToSubcategory(String productName, String subcategoryName) {
-        Map<String, Object> data = loadCatalog();
-        if (data == null || !data.containsKey("catalog")) {
-            System.out.println("[YAML] ❌ Файл каталогу не містить ключ 'catalog'");
-            return false;
-        }
-
-        // 1️⃣ Шукаємо товар у секції "products"
         Map<String, Object> foundProduct = null;
+
         if (data.containsKey("products")) {
-            List<Map<String, Object>> allProducts = (List<Map<String, Object>>) data.get("products");
-            for (Map<String, Object> p : allProducts) {
-                String name = Objects.toString(p.get("name"), "").trim();
-                if (name.equalsIgnoreCase(productName.trim())) {
+            List<Map<String, Object>> rootProducts = (List<Map<String, Object>>) data.get("products");
+            for (Map<String, Object> p : rootProducts) {
+                if (Objects.toString(p.get("name"), "").equalsIgnoreCase(productName)) {
                     foundProduct = p;
                     break;
                 }
             }
         }
 
-        if (foundProduct == null) {
-            System.out.println("[YAML] ❌ Товар '" + productName + "' не знайдено у секції 'products'");
-            return false;
-        }
+        if (foundProduct == null) return false;
 
-        // 2️⃣ Створюємо копію товару, щоб не змінювати оригінал
         Map<String, Object> productCopy = new LinkedHashMap<>(foundProduct);
-        productCopy.putIfAbsent("unit", "шт");
         productCopy.putIfAbsent("description", "");
         productCopy.putIfAbsent("photo", "");
-        productCopy.putIfAbsent("manufacturer", "");
+        productCopy.putIfAbsent("unit", "шт");
 
-        // 3️⃣ Шукаємо підкатегорію у "catalog"
         List<Map<String, Object>> categories = (List<Map<String, Object>>) data.get("catalog");
         for (Map<String, Object> category : categories) {
             List<Map<String, Object>> subgroups = (List<Map<String, Object>>) category.get("subgroups");
             if (subgroups == null) continue;
 
             for (Map<String, Object> subgroup : subgroups) {
-                String subName = Objects.toString(subgroup.get("name"), "").trim();
-                if (subName.equalsIgnoreCase(subcategoryName.trim())) {
-
-                    List<Map<String, Object>> subgroupProducts =
-                            (List<Map<String, Object>>) subgroup.get("products");
-                    if (subgroupProducts == null) {
-                        subgroupProducts = new ArrayList<>();
-                        subgroup.put("products", subgroupProducts);
+                if (Objects.toString(subgroup.get("name"), "").equalsIgnoreCase(subcategoryName)) {
+                    List<Map<String, Object>> products = (List<Map<String, Object>>) subgroup.computeIfAbsent("products", k -> new ArrayList<>());
+                    boolean exists = products.stream()
+                            .anyMatch(p -> Objects.toString(p.get("name"), "").equalsIgnoreCase(productName));
+                    if (!exists) {
+                        products.add(productCopy);
+                        saveCatalog(data);
+                        return true;
                     }
-
-                    // 4️⃣ Перевіряємо, щоб не було дублікатів
-                    boolean exists = subgroupProducts.stream()
-                            .anyMatch(p -> Objects.toString(p.get("name"), "")
-                                    .equalsIgnoreCase(productName.trim()));
-
-                    if (exists) {
-                        System.out.println("[YAML] ⚠ Товар '" + productName +
-                                "' уже є у підкатегорії '" + subcategoryName + "'");
-                        return false;
-                    }
-
-                    // 5️⃣ Додаємо товар у підкатегорію
-                    subgroupProducts.add(productCopy);
-                    saveCatalog(data);
-
-                    System.out.println("[YAML] ✅ Товар '" + productName +
-                            "' додано у підкатегорію '" + subcategoryName + "'");
-                    return true;
                 }
-            }
-        }
-
-        System.out.println("[YAML] ❌ Підкатегорію '" + subcategoryName + "' не знайдено");
-        return false;
-    }
-
-    public static boolean addSubcategory(String categoryName, String subcategoryName) {
-        Map<String, Object> data = loadCatalog();
-        if (!data.containsKey("catalog")) return false;
-
-        List<Map<String, Object>> catalog = (List<Map<String, Object>>) data.get("catalog");
-        for (Map<String, Object> category : catalog) {
-            String currentName = Objects.toString(category.get("name"), "");
-            if (currentName.equalsIgnoreCase(categoryName)) {
-                List<Map<String, Object>> subgroups = (List<Map<String, Object>>) category.get("subgroups");
-                if (subgroups == null) {
-                    subgroups = new ArrayList<>();
-                    category.put("subgroups", subgroups);
-                }
-
-                boolean exists = subgroups.stream()
-                        .anyMatch(sg -> subcategoryName.equalsIgnoreCase(Objects.toString(sg.get("name"), "")));
-                if (exists) return false;
-
-                Map<String, Object> newSub = new LinkedHashMap<>();
-                newSub.put("name", subcategoryName);
-                newSub.put("products", new ArrayList<>());
-                subgroups.add(newSub);
-
-                saveCatalog(data);
-                return true;
             }
         }
         return false;
-    }
-
-    public static boolean deleteCategory(String categoryName) {
-        Map<String, Object> data = loadCatalog();
-        if (!data.containsKey("catalog")) return false;
-
-        List<Map<String, Object>> catalog = (List<Map<String, Object>>) data.get("catalog");
-        Iterator<Map<String, Object>> iterator = catalog.iterator();
-        boolean removed = false;
-
-        while (iterator.hasNext()) {
-            Map<String, Object> category = iterator.next();
-            if (categoryName.equalsIgnoreCase(Objects.toString(category.get("name"), ""))) {
-                iterator.remove();
-                removed = true;
-                break;
-            }
-        }
-
-        if (removed) saveCatalog(data);
-        return removed;
-    }
-
-    @SuppressWarnings("unchecked")
-    public static boolean updateProductManufacturer(String productName, String manufacturerValue) {
-        Map<String, Object> data = loadCatalog();
-        if (!data.containsKey("products")) {
-            System.err.println("ERROR: catalog.yml не має секції 'products'");
-            return false;
-        }
-
-        List<Map<String, Object>> products = (List<Map<String, Object>>) data.get("products");
-        boolean updated = false;
-
-        for (Map<String, Object> product : products) {
-            String name = Objects.toString(product.get("name"), "");
-            if (name.equalsIgnoreCase(productName)) {
-                if (manufacturerValue.equalsIgnoreCase("❌") || manufacturerValue.isEmpty()) {
-                    product.remove("manufacturer");
-                } else {
-                    product.put("manufacturer", manufacturerValue.trim());
-                }
-                updated = true;
-                break;
-            }
-        }
-
-        if (!updated) {
-            System.err.println("ERROR: Товар '" + productName + "' не знайдено у catalog.yml");
-            return false;
-        }
-
-        saveCatalog(data);
-        return true;
     }
 }

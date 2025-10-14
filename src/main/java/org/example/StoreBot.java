@@ -1702,7 +1702,7 @@ public class StoreBot extends TelegramLongPollingBot {
         }
 
         // Додаємо категорію і підкатегорію у CatalogEditor
-        CatalogEditor.addCategory(categoryName, text.isEmpty() ? null : text);
+        CatalogEditor.addCategory(categoryName); // ✅
 
         sendText(chatId, "✅ Категорія та підкатегорія додані у каталог:\nКатегорія: " + categoryName + (text.isEmpty() ? "" : "\nПідкатегорія: " + text));
 
