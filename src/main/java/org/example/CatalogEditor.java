@@ -202,9 +202,9 @@ public class CatalogEditor {
 
     // --- Отримати ціну продукту з YAML
     public static double getProductPriceFromYAML(String productName) {
-        try (InputStream inputStream = CatalogEditor.class.getClassLoader().getResourceAsStream("products.yml")) {
+        try (InputStream inputStream = CatalogEditor.class.getClassLoader().getResourceAsStream("catalog.yml")) {
             if (inputStream == null) {
-                System.out.println("DEBUG: products.yaml not found");
+                System.out.println("DEBUG: catalog.yml not found");
                 return 0.0;
             }
 
