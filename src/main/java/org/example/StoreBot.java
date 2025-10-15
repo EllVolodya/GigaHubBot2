@@ -1153,7 +1153,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
                 // --- Збереження в базу ---
                 try (Connection conn = DatabaseManager.getConnection()) {
-                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, city, fullName, phone, card, status, total, date, items) " +
+                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, city, fullName, phone, card, status, total, date, item) " +
                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)";
                     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                         stmt.setString(1, orderCode);
@@ -1225,7 +1225,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
                 // --- Збереження в базу ---
                 try (Connection conn = DatabaseManager.getConnection()) {
-                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, address, fullName, phone, card, status, total, date, items) " +
+                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, address, fullName, phone, card, status, total, date, item) " +
                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)";
                     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                         stmt.setString(1, orderCode);
@@ -1299,7 +1299,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
                 // --- Збереження в базу ---
                 try (Connection conn = DatabaseManager.getConnection()) {
-                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, postOffice, fullName, phone, card, status, total, date, items) " +
+                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, postOffice, fullName, phone, card, status, total, date, item) " +
                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)";
                     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                         stmt.setString(1, orderCode);
