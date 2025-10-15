@@ -7,12 +7,28 @@ import java.util.*;
 
 public class OrderFileManager {
 
-    // Додати нове замовлення
+    // --- Додати нове замовлення
     public static boolean addOrder(Map<String, Object> orderData) {
+        // Генеруємо рядок item для БД і рахуємо total
+        List<Map<String, Object>> cart = (List<Map<String, Object>>) orderData.get("items");
+        StringBuilder itemsDb = new StringBuilder();
+        double total = 0;
+        if (cart != null) {
+            for (Map<String, Object> item : cart) {
+                String name = item.getOrDefault("name", item.getOrDefault("title", "Без назви")).toString();
+                double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
+                itemsDb.append(name).append(":").append(price).append(";");
+                total += price;
+            }
+        }
+
+        orderData.put("item", itemsDb.toString()); // для TEXT колонки
+        orderData.put("total", total);             // підрахунок total
+
         String sql = "INSERT INTO orders " +
                 "(orderCode, userId, deliveryType, city, address, postOffice, " +
-                "fullName, phone, card, status, comment, total, date, items) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::json)";
+                "fullName, phone, card, status, comment, total, item, date) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -28,9 +44,9 @@ public class OrderFileManager {
             stmt.setString(9, (String) orderData.getOrDefault("card", null));
             stmt.setString(10, (String) orderData.getOrDefault("status", "Нове"));
             stmt.setString(11, (String) orderData.getOrDefault("comment", ""));
-            stmt.setDouble(12, (Double) orderData.getOrDefault("total", 0.0));
-            stmt.setDate(13, Date.valueOf(LocalDate.now())); // поточна дата
-            stmt.setString(14, (String) orderData.getOrDefault("items", "{}")); // JSON як рядок
+            stmt.setDouble(12, total);               // підрахований total
+            stmt.setString(13, itemsDb.toString());  // TEXT item
+            stmt.setDate(14, Date.valueOf(LocalDate.now()));
 
             stmt.executeUpdate();
             System.out.println("✅ Нове замовлення додано: " + orderData.get("orderCode"));
@@ -41,7 +57,7 @@ public class OrderFileManager {
         }
     }
 
-    // Оновити статус замовлення
+    // --- Оновити статус замовлення
     public static boolean updateOrderStatus(String orderCode, String status, String comment) {
         String sql = "UPDATE orders SET status = ?, comment = ? WHERE orderCode = ?";
         try (Connection conn = DatabaseManager.getConnection();
@@ -65,7 +81,7 @@ public class OrderFileManager {
         }
     }
 
-    // Видалити замовлення
+    // --- Видалити замовлення
     public static boolean deleteOrder(String orderCode) {
         String sql = "DELETE FROM orders WHERE orderCode = ?";
         try (Connection conn = DatabaseManager.getConnection();
@@ -88,7 +104,7 @@ public class OrderFileManager {
         }
     }
 
-    // Отримати всі замовлення
+    // --- Отримати всі замовлення
     public static List<Map<String, Object>> getOrders() {
         List<Map<String, Object>> orders = new ArrayList<>();
         String sql = "SELECT * FROM orders ORDER BY id DESC";
@@ -113,7 +129,7 @@ public class OrderFileManager {
                 order.put("comment", rs.getString("comment"));
                 order.put("total", rs.getDouble("total"));
                 order.put("date", rs.getDate("date"));
-                order.put("items", rs.getString("items")); // JSON як рядок
+                order.put("item", rs.getString("item")); // для адмін-повідомлень
                 orders.add(order);
             }
 
