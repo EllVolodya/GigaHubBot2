@@ -4,6 +4,8 @@ import java.sql.*;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class OrderFileManager {
 
@@ -11,7 +13,6 @@ public class OrderFileManager {
     public static boolean addOrder(Map<String, Object> orderData) {
         System.out.println("[addOrder] Starting to add order: " + orderData);
 
-        // Generate item string for DB and calculate total
         List<Map<String, Object>> cart = (List<Map<String, Object>>) orderData.get("items");
         StringBuilder itemsDb = new StringBuilder();
         double total = 0;
@@ -19,16 +20,35 @@ public class OrderFileManager {
         if (cart != null) {
             for (Map<String, Object> item : cart) {
                 String name = item.getOrDefault("name", item.getOrDefault("title", "Unnamed")).toString();
-                double price = 0;
                 Object priceObj = item.get("price");
-                try {
-                    if (priceObj instanceof Number n) price = n.doubleValue();
-                    else if (priceObj != null) price = Double.parseDouble(priceObj.toString());
-                } catch (NumberFormatException e) {
-                    System.err.println("[addOrder] Cannot parse price: " + priceObj);
+                double price = 0;
+
+                System.out.println("[addOrder] Raw priceObj = " + priceObj +
+                        " (type=" + (priceObj == null ? "null" : priceObj.getClass().getSimpleName()) + ")");
+
+                if (priceObj != null) {
+                    String priceStr = priceObj.toString().trim();
+
+                    // Try to extract first numeric value (e.g. "Ціна: 191 грн за шт" → 191)
+                    Matcher matcher = Pattern.compile("([0-9]+([.,][0-9]+)?)").matcher(priceStr);
+                    if (matcher.find()) {
+                        String numeric = matcher.group(1).replace(",", ".");
+                        try {
+                            price = Double.parseDouble(numeric);
+                        } catch (NumberFormatException e) {
+                            System.err.println("[addOrder] Failed to parse numeric price: " + numeric);
+                        }
+                    } else {
+                        System.err.println("[addOrder] No numeric value found in: " + priceStr);
+                    }
+                } else {
+                    System.err.println("[addOrder] priceObj is null for item: " + name);
                 }
+
                 itemsDb.append(name).append(":").append(price).append(";");
                 total += price;
+
+                System.out.println("[addOrder] Parsed item: " + name + " | price=" + price);
             }
         }
 
@@ -65,7 +85,7 @@ public class OrderFileManager {
 
             int rows = stmt.executeUpdate();
             System.out.println("[addOrder] Rows inserted: " + rows);
-            return true;
+            return rows > 0;
 
         } catch (SQLException e) {
             System.err.println("[addOrder] SQL error: " + e.getMessage());

@@ -127,7 +127,7 @@ public class StoreBot extends TelegramLongPollingBot {
                         orderData.put("total", total);
                         orderData.put("status", "Нове");
                         orderData.put("date", LocalDateTime.now().toString());
-                        orderData.put("type", "pickup"); // 🚀 ВАЖЛИВО: самовивіз
+                        orderData.put("type", "pickup");
 
                         userOrders.computeIfAbsent(userId, k -> new ArrayList<>()).add(orderData);
                         OrderFileManager.addOrder(orderData);
