@@ -874,37 +874,46 @@ public class StoreBot extends TelegramLongPollingBot {
 
             // ← Додаємо обробку стану відхилення замовлення
             case "reject_order_reason" -> {
-                int idx = adminOrderIndex.getOrDefault(userId, 0);
-                if (userOrders.isEmpty()) {
-                    sendText(chatId, "Замовлень немає.");
-                    break;
-                }
-
-                Long orderUserId = new ArrayList<>(userOrders.keySet()).get(0);
-                List<Map<String, Object>> ordersList = userOrders.get(orderUserId);
-                if (ordersList.isEmpty()) {
-                    sendText(chatId, "Замовлень немає.");
-                    break;
-                }
-
-                Map<String, Object> order = ordersList.get(idx);
-
                 String reason = text; // текст, який ввів адміністратор
-                sendText(orderUserId.toString(), "❌ Ваше замовлення відхилено.\nПричина: " + reason);
 
-                // Оновлюємо файл і статус
-                OrderFileManager.updateOrderStatus(order.get("orderCode").toString(), "Відхилено", reason);
+                try (Connection conn = DatabaseManager.getConnection()) {
+                    // Беремо перше замовлення з бази для цього адміністратора
+                    String sql = "SELECT * FROM orders ORDER BY id ASC LIMIT 1";
+                    try (PreparedStatement stmt = conn.prepareStatement(sql);
+                         ResultSet rs = stmt.executeQuery()) {
 
-                // Видаляємо замовлення з пам'яті
-                ordersList.remove(idx);
+                        if (!rs.isBeforeFirst()) {
+                            sendText(chatId, "Замовлень немає.");
+                            userStates.remove(userId);
+                            break;
+                        }
 
-                sendText(chatId, "Замовлення відхилено ✅");
+                        if (rs.next()) {
+                            Long orderUserId = rs.getLong("userId");
+                            String orderCode = rs.getString("orderCode");
 
-                // Оновлюємо відображення адміну
-                if (ordersList.isEmpty()) {
-                    sendText(chatId, "Замовлень немає.");
-                } else {
-                    showAdminOrder(userId, chatId);
+                            // Відправляємо повідомлення користувачу
+                            sendText(orderUserId.toString(), "❌ Ваше замовлення відхилено.\nПричина: " + reason);
+
+                            // Оновлюємо статус у базі
+                            String updateSql = "UPDATE orders SET status = ?, reason = ? WHERE orderCode = ?";
+                            try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                                updateStmt.setString(1, "Відхилено");
+                                updateStmt.setString(2, reason);
+                                updateStmt.setString(3, orderCode);
+                                updateStmt.executeUpdate();
+                            }
+
+                            // Повідомляємо адміну
+                            sendText(chatId, "Замовлення відхилено ✅");
+
+                            // Показуємо наступне замовлення адміну
+                            showAdminOrder(userId, chatId);
+                        }
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "❌ Помилка при обробці замовлення.");
                 }
 
                 // Очищаємо стан
