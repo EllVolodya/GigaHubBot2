@@ -1866,10 +1866,20 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
-    private void handleDeleteCategorySelect(Long userId, String chatId, String text) {
-        boolean removed = CatalogEditor.deleteCategory(text);
-        if (removed) sendText(chatId, "✅ Категорія '" + text + "' успішно видалена!");
-        else sendText(chatId, "❌ Категорія '" + text + "' не знайдена. Перевірте назву.");
+    private void handleDeleteCategorySelect(Long userId, String chatId, String categoryName) {
+        if (categoryName == null || categoryName.isBlank()) {
+            sendText(chatId, "❌ Помилка: назва категорії не може бути порожньою.");
+            userStates.remove(userId);
+            return;
+        }
+
+        boolean removed = CatalogEditor.deleteCategory(categoryName);
+        if (removed) {
+            sendText(chatId, "✅ Категорія '" + categoryName + "' успішно видалена!");
+        } else {
+            sendText(chatId, "❌ Категорія '" + categoryName + "' не знайдена. Перевірте назву.");
+        }
+
         userStates.remove(userId);
     }
 

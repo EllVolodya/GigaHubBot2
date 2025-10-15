@@ -6,19 +6,19 @@ import java.sql.SQLException;
 
 public class DatabaseManager {
 
-    // URL для підключення до Railway MySQL
-    private static final String URL = "jdbc:mysql://root:bNhtxmMdEfRGKAfbbLpwZzDOcbwXKfhG@shortline.proxy.rlwy.net:59768/railway";
-    private static final String USER = "root"; // твій логін
-    private static final String PASSWORD = "bNhtxmMdEfRGKAfbbLpwZzDOcbwXKfhG"; // твій пароль з Railway
+    private static final String URL = "jdbc:mysql://shortline.proxy.rlwy.net:59768/railway";
+    private static final String USER = "root";
+    private static final String PASSWORD = "bNhtxmMdEfRGKAfbbLpwZzDOcbwXKfhG";
 
-    private static Connection connection;
-
+    // --- Підключення до бази
     public static void connect() {
         try {
-            if (connection == null || connection.isClosed()) {
-                Class.forName("com.mysql.cj.jdbc.Driver");
-                connection = DriverManager.getConnection(URL, USER, PASSWORD);
-                System.out.println("✅ Database connected successfully!");
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            // Тестове підключення
+            try (Connection conn = DriverManager.getConnection(URL, USER, PASSWORD)) {
+                if (conn != null) {
+                    System.out.println("✅ Database connected successfully!");
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -26,39 +26,14 @@ public class DatabaseManager {
         }
     }
 
-    public static boolean insertProduct(String name, String price, String unit, String description, String photo) {
-        String sql = "INSERT INTO products (name, price, unit, description, photo) VALUES (?, ?, ?, ?, ?)";
-        try (Connection conn = getConnection();
-             var stmt = conn.prepareStatement(sql)) {
-
-            stmt.setString(1, name);
-            stmt.setString(2, price);
-            stmt.setString(3, unit);
-            stmt.setString(4, description);
-            stmt.setString(5, photo);
-            stmt.executeUpdate();
-
-            System.out.println("✅ Товар '" + name + "' додано у базу даних!");
-            return true;
-
-        } catch (SQLException e) {
-            System.out.println("❌ Помилка при додаванні товару '" + name + "': " + e.getMessage());
-            return false;
-        }
+    // --- Отримати нове з'єднання
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL, USER, PASSWORD);
     }
 
-    public static Connection getConnection() {
-        return connection;
-    }
-
+    // --- Відключення (для сумісності)
     public static void disconnect() {
-        try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
-                System.out.println("🔌 Database disconnected.");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        // Нічого не робимо, бо getConnection() відкриває нове підключення кожного разу
+        System.out.println("🔌 Disconnect not needed: connections auto-closed after use.");
     }
 }

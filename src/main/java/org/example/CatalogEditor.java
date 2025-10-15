@@ -1,14 +1,13 @@
 package org.example;
+
 import org.yaml.snakeyaml.Yaml;
 
-import java.util.*;
 import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.*;
 
 public class CatalogEditor {
 
@@ -36,15 +35,15 @@ public class CatalogEditor {
         }
     }
 
-    // --- Перевірити існування категорії
-    public static boolean categoryExists(String categoryName) {
-        String sql = "SELECT id FROM categories WHERE name = ?";
+    // --- Видалити категорію
+    public static boolean deleteCategory(String categoryName) {
+        String sql = "DELETE FROM categories WHERE name = ?";
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, categoryName);
-            ResultSet rs = stmt.executeQuery();
-            return rs.next();
+            int rows = stmt.executeUpdate();
+            return rows > 0;
 
         } catch (SQLException e) {
             e.printStackTrace();
@@ -89,81 +88,14 @@ public class CatalogEditor {
         }
     }
 
-    // --- Видалити категорію
-    public static boolean deleteCategory(String categoryName) {
-        Map<String, Object> data = CatalogManager.loadCatalog();
-        List<Map<String, Object>> catalog = (List<Map<String, Object>>) data.get("catalog");
-        if (catalog == null) return false;
-
-        boolean removed = catalog.removeIf(c -> Objects.toString(c.get("name"), "").equalsIgnoreCase(categoryName));
-        if (removed) CatalogManager.saveCatalog(data);
-        return removed;
-    }
-
-    // --- Оновити будь-яке поле товару (наприклад: description, photo, unit)
-    public static boolean updateField(String productName, String field, Object value) {
-        if (!isAllowedField(field)) {
-            System.out.println("❌ Заборонене поле: " + field);
-            return false;
-        }
-
-        String sql = "UPDATE products SET " + field + " = ? WHERE name = ?";
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setObject(1, value);
-            stmt.setString(2, productName);
-            int rows = stmt.executeUpdate();
-
-            if (rows > 0) {
-                System.out.println("✅ Поле '" + field + "' оновлено для '" + productName + "'");
-                return true;
-            } else {
-                System.out.println("❌ Не знайдено товар: " + productName);
-                return false;
-            }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    private static boolean updateFieldInCatalog(List<Map<String, Object>> groups, String productName, String field, Object value, Map<String, Object> fullData) {
-        for (Map<String, Object> group : groups) {
-            List<Map<String, Object>> products = (List<Map<String, Object>>) group.get("products");
-            if (products != null) {
-                for (Map<String, Object> p : products) {
-                    if (Objects.toString(p.get("name"), "").equalsIgnoreCase(productName)) {
-                        p.put(field, value);
-                        CatalogManager.saveCatalog(fullData);
-                        return true;
-                    }
-                }
-            }
-
-            List<Map<String, Object>> subgroups = (List<Map<String, Object>>) group.get("subgroups");
-            if (subgroups != null) {
-                boolean updated = updateFieldInCatalog(subgroups, productName, field, value, fullData);
-                if (updated) return true;
-            }
-        }
-        return false;
-    }
-
-    // --- Оновити виробника
-    public static boolean updateProductManufacturer(String productName, String manufacturer) {
-        return updateField(productName, "manufacturer", manufacturer);
-    }
-
     // --- Додати товар у підкатегорію
     public static boolean addProductToSubcategory(String productName, String price, String subcategoryName) {
         String findSubSql = "SELECT id FROM subcategories WHERE name = ?";
         String checkProductSql = "SELECT id FROM products WHERE name = ? AND subcategory_id = ?";
         String insertSql = """
-            INSERT INTO products (name, price, unit, description, photo, created_at, subcategory_id)
-            VALUES (?, ?, 'шт', '', '', CURRENT_DATE, ?)
-            """;
+                INSERT INTO products (name, price, unit, description, photo, created_at, subcategory_id)
+                VALUES (?, ?, 'шт', '', '', CURRENT_DATE, ?)
+                """;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement findSubStmt = conn.prepareStatement(findSubSql);
@@ -197,14 +129,67 @@ public class CatalogEditor {
         }
     }
 
-    // --- Допоміжний метод: обмеження оновлення лише дозволених полів
-    private static boolean isAllowedField(String field) {
-        return field.equals("price") ||
-                field.equals("description") ||
-                field.equals("photo") ||
-                field.equals("unit");
+    // --- Оновити виробника
+    public static boolean updateProductManufacturer(String productName, String manufacturer) {
+        String sql = "UPDATE products SET manufacturer = ? WHERE name = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, manufacturer);
+            stmt.setString(2, productName);
+            int rows = stmt.executeUpdate();
+            return rows > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
+    // --- Допоміжний метод: обмеження оновлення лише дозволених полів
+    private static boolean isAllowedField(String field) {
+        return field.equals("price") || field.equals("description") || field.equals("photo") || field.equals("unit");
+    }
+
+    // --- Перевірка існування категорії
+    public static boolean categoryExists(String categoryName) {
+        String sql = "SELECT id FROM categories WHERE name = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, categoryName);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // --- Оновити будь-яке поле товару
+    public static boolean updateField(String productName, String field, Object value) {
+        if (!isAllowedField(field)) {
+            System.out.println("❌ Заборонене поле: " + field);
+            return false;
+        }
+
+        String sql = "UPDATE products SET " + field + " = ? WHERE name = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setObject(1, value);
+            stmt.setString(2, productName);
+            int rows = stmt.executeUpdate();
+            return rows > 0;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // --- Отримати ціну продукту з YAML
     public static String getProductPriceFromYAML(String productName) {
         try (InputStream inputStream = CatalogEditor.class.getClassLoader().getResourceAsStream("products.yaml")) {
             if (inputStream == null) return "0";
