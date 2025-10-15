@@ -6,7 +6,7 @@ import java.sql.SQLException;
 
 public class DatabaseManager {
 
-    private static final String URL = "jdbc:mysql://shortline.proxy.rlwy.net:21254/railway";
+    private static final String URL = "jdbc:mysql://root:ByZkOlzbofgNZSBVlPCdjayWsDBJfEcP@crossover.proxy.rlwy.net:21254/railway";
     private static final String USER = "root";
     private static final String PASSWORD = "ByZkOlzbofgNZSBVlPCdjayWsDBJfEcP";
 
