@@ -1153,14 +1153,13 @@ public class StoreBot extends TelegramLongPollingBot {
                 String phone = parts.length > 2 ? parts[2].trim() : "Невідомо";
                 String card = parts.length > 3 ? parts[3].trim() : "Немає";
 
-                // Формуємо текстовий список товарів
-                StringBuilder itemsText = new StringBuilder();
+                // Формуємо текстовий список товарів у форматі Назва:Ціна;
+                StringBuilder itemsDb = new StringBuilder();
                 double total = 0;
-                int i = 1;
                 for (Map<String, Object> item : cart) {
                     String name = item.getOrDefault("name", "Без назви").toString();
                     double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
-                    itemsText.append(i++).append(". ").append(name).append(" — ").append(price).append(" грн\n");
+                    itemsDb.append(name).append(":").append(price).append(";");
                     total += price;
                 }
 
@@ -1178,7 +1177,7 @@ public class StoreBot extends TelegramLongPollingBot {
                         stmt.setString(7, card);
                         stmt.setString(8, "Нове");
                         stmt.setDouble(9, total);
-                        stmt.setString(10, itemsText.toString());
+                        stmt.setString(10, itemsDb.toString());
                         stmt.executeUpdate();
                     }
                 } catch (SQLException e) {
@@ -1196,9 +1195,15 @@ public class StoreBot extends TelegramLongPollingBot {
                             .append("🏙 Місто: ").append(city).append("\n")
                             .append("👤 П.І.: ").append(fullName).append("\n")
                             .append("📞 Телефон: ").append(phone).append("\n")
-                            .append("💳 Картка: ").append(card).append("\n\n")
-                            .append(itemsText)
-                            .append("\n💰 Всього: ").append(total).append(" грн");
+                            .append("💳 Картка: ").append(card).append("\n\n");
+
+                    int i = 1;
+                    for (Map<String, Object> item : cart) {
+                        sb.append(i++).append(". 🛒 ").append(item.getOrDefault("name", "Без назви"))
+                                .append(" — ").append(item.getOrDefault("price", "0")).append(" грн\n");
+                    }
+                    sb.append("\n💰 Всього: ").append(total).append(" грн");
+
                     sendText(adminId.toString(), sb.toString());
                 }
 
@@ -1218,25 +1223,24 @@ public class StoreBot extends TelegramLongPollingBot {
 
                 String orderCode = String.format("%04d", new Random().nextInt(10000));
 
-                // Розбираємо дані користувача: Адреса, П.І., Телефон, Картка
+                // Дані користувача: Адреса, П.І., Телефон, Картка
                 String[] parts = text.split(",", 4);
                 String address = parts.length > 0 ? parts[0].trim() : "Невідомо";
                 String fullName = parts.length > 1 ? parts[1].trim() : "Невідомо";
                 String phone = parts.length > 2 ? parts[2].trim() : "Невідомо";
                 String card = parts.length > 3 ? parts[3].trim() : "Немає";
 
-                // Формуємо текстовий список товарів
-                StringBuilder itemsText = new StringBuilder();
+                // Формуємо рядок items для БД
+                StringBuilder itemsDb = new StringBuilder();
                 double total = 0;
-                int i = 1;
                 for (Map<String, Object> item : cart) {
                     String name = item.getOrDefault("name", "Без назви").toString();
                     double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
-                    itemsText.append(i++).append(". ").append(name).append(" — ").append(price).append(" грн\n");
+                    itemsDb.append(name).append(":").append(price).append(";");
                     total += price;
                 }
 
-                // --- Збереження в базу ---
+                // --- Збереження в БД ---
                 try (Connection conn = DatabaseManager.getConnection()) {
                     String sql = "INSERT INTO orders (orderCode, userId, deliveryType, address, fullName, phone, card, status, total, date, item) " +
                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)";
@@ -1250,7 +1254,7 @@ public class StoreBot extends TelegramLongPollingBot {
                         stmt.setString(7, card);
                         stmt.setString(8, "Нове");
                         stmt.setDouble(9, total);
-                        stmt.setString(10, itemsText.toString());
+                        stmt.setString(10, itemsDb.toString());
                         stmt.executeUpdate();
                     }
                 } catch (SQLException e) {
@@ -1268,9 +1272,15 @@ public class StoreBot extends TelegramLongPollingBot {
                             .append("🏠 Адреса: ").append(address).append("\n")
                             .append("👤 П.І.: ").append(fullName).append("\n")
                             .append("📞 Телефон: ").append(phone).append("\n")
-                            .append("💳 Картка: ").append(card).append("\n\n")
-                            .append(itemsText)
-                            .append("\n💰 Всього: ").append(total).append(" грн");
+                            .append("💳 Картка: ").append(card).append("\n\n");
+
+                    int i = 1;
+                    for (Map<String, Object> item : cart) {
+                        sb.append(i++).append(". 🛒 ").append(item.getOrDefault("name", "Без назви"))
+                                .append(" — ").append(item.getOrDefault("price", "0")).append(" грн\n");
+                    }
+                    sb.append("\n💰 Всього: ").append(total).append(" грн");
+
                     sendText(adminId.toString(), sb.toString());
                 }
 
@@ -1292,25 +1302,24 @@ public class StoreBot extends TelegramLongPollingBot {
 
                 String orderCode = String.format("%04d", new Random().nextInt(10000));
 
-                // Розбираємо дані користувача: Відділення НП, П.І., Телефон, Картка
+                // Дані користувача: Відділення НП, П.І., Телефон, Картка
                 String[] parts = text.split(",", 4);
                 String postOffice = parts.length > 0 ? parts[0].trim() : "Невідомо";
                 String fullName = parts.length > 1 ? parts[1].trim() : "Невідомо";
                 String phone = parts.length > 2 ? parts[2].trim() : "Невідомо";
                 String card = parts.length > 3 ? parts[3].trim() : "Немає";
 
-                // Формуємо текстовий список товарів
-                StringBuilder itemsText = new StringBuilder();
+                // Формуємо рядок items для БД
+                StringBuilder itemsDb = new StringBuilder();
                 double total = 0;
-                int i = 1;
                 for (Map<String, Object> item : cart) {
                     String name = item.getOrDefault("name", "Без назви").toString();
                     double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
-                    itemsText.append(i++).append(". ").append(name).append(" — ").append(price).append(" грн\n");
+                    itemsDb.append(name).append(":").append(price).append(";");
                     total += price;
                 }
 
-                // --- Збереження в базу ---
+                // --- Збереження в БД ---
                 try (Connection conn = DatabaseManager.getConnection()) {
                     String sql = "INSERT INTO orders (orderCode, userId, deliveryType, postOffice, fullName, phone, card, status, total, date, item) " +
                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)";
@@ -1324,7 +1333,7 @@ public class StoreBot extends TelegramLongPollingBot {
                         stmt.setString(7, card);
                         stmt.setString(8, "Нове");
                         stmt.setDouble(9, total);
-                        stmt.setString(10, itemsText.toString());
+                        stmt.setString(10, itemsDb.toString());
                         stmt.executeUpdate();
                     }
                 } catch (SQLException e) {
@@ -1342,9 +1351,15 @@ public class StoreBot extends TelegramLongPollingBot {
                             .append("📮 Відділення НП: ").append(postOffice).append("\n")
                             .append("👤 П.І.: ").append(fullName).append("\n")
                             .append("📞 Телефон: ").append(phone).append("\n")
-                            .append("💳 Картка: ").append(card).append("\n\n")
-                            .append(itemsText)
-                            .append("\n💰 Всього: ").append(total).append(" грн");
+                            .append("💳 Картка: ").append(card).append("\n\n");
+
+                    int i = 1;
+                    for (Map<String, Object> item : cart) {
+                        sb.append(i++).append(". 🛒 ").append(item.getOrDefault("name", "Без назви"))
+                                .append(" — ").append(item.getOrDefault("price", "0")).append(" грн\n");
+                    }
+                    sb.append("\n💰 Всього: ").append(total).append(" грн");
+
                     sendText(adminId.toString(), sb.toString());
                 }
 
@@ -2618,17 +2633,15 @@ public class StoreBot extends TelegramLongPollingBot {
     // 🔹 Показує одне замовлення адміну з кнопками
     private void showAdminOrder(Long adminId, String chatId) {
         try (Connection conn = DatabaseManager.getConnection()) {
-            // Отримуємо всі замовлення
             String sql = "SELECT * FROM orders ORDER BY id ASC";
             PreparedStatement stmt = conn.prepareStatement(sql);
             ResultSet rs = stmt.executeQuery();
 
-            if (!rs.isBeforeFirst()) { // якщо немає рядків
+            if (!rs.isBeforeFirst()) {
                 sendText(chatId, "Замовлень немає.");
                 return;
             }
 
-            // Витягуємо перше замовлення (пізніше можна зробити пагінацію)
             if (rs.next()) {
                 Map<String, Object> order = new HashMap<>();
                 order.put("id", rs.getInt("id"));
@@ -2647,15 +2660,19 @@ public class StoreBot extends TelegramLongPollingBot {
 
                 // --- Розбираємо items з рядка у List<Map<String, Object>> ---
                 List<Map<String, Object>> items = new ArrayList<>();
-                String itemsStr = rs.getString("items"); // формат: Назва:Ціна;Назва:Ціна;
+                String itemsStr = rs.getString("item"); // читаємо колонку item
                 if (itemsStr != null && !itemsStr.isEmpty()) {
                     String[] parts = itemsStr.split(";");
                     for (String part : parts) {
                         if (part.isEmpty()) continue;
                         String[] pair = part.split(":");
                         Map<String, Object> item = new HashMap<>();
-                        item.put("name", pair[0]);
-                        item.put("price", Double.parseDouble(pair[1]));
+                        item.put("name", pair[0].trim());
+                        try {
+                            item.put("price", Double.parseDouble(pair[1].trim()));
+                        } catch (Exception ex) {
+                            item.put("price", 0.0);
+                        }
                         items.add(item);
                     }
                 }
