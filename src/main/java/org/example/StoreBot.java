@@ -2584,6 +2584,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
     // 🔹 Показує одне замовлення адміну з кнопками
     private void showAdminOrder(Long adminId, String chatId) {
+        // Отримуємо поточний індекс для адміна
         int idx = adminOrderIndex.getOrDefault(adminId, 0);
 
         if (userOrders.isEmpty()) {
@@ -2591,7 +2592,7 @@ public class StoreBot extends TelegramLongPollingBot {
             return;
         }
 
-        // 👉 поки що беремо першого користувача зі списку
+        // Беремо першого користувача зі списку (можна розширити, щоб переглядати всіх користувачів)
         Long orderUserId = new ArrayList<>(userOrders.keySet()).get(0);
         List<Map<String, Object>> orders = userOrders.get(orderUserId);
 
@@ -2600,14 +2601,18 @@ public class StoreBot extends TelegramLongPollingBot {
             return;
         }
 
-        // якщо нажали далі немає товару за межі списку – повертаємось на початок
+        // Якщо індекс за межами списку, повертаємося на початок
         if (idx >= orders.size()) {
             idx = 0;
-            adminOrderIndex.put(adminId, idx);
         }
 
+        // Зберігаємо актуальний індекс
+        adminOrderIndex.put(adminId, idx);
+
+        // Беремо замовлення
         Map<String, Object> order = orders.get(idx);
 
+        // Відправляємо повідомлення адміну з меню замовлення
         sendMessage(createOrderAdminMenu(chatId, order, orderUserId));
     }
 
