@@ -500,10 +500,21 @@ public class StoreBot extends TelegramLongPollingBot {
                     }
                 }
 
-                case "✅ Підтвердити замовлення" -> {
+                case "✅ Підтвердити" -> {
                     int idx = adminOrderIndex.getOrDefault(userId, 0);
+                    if (userOrders.isEmpty()) {
+                        sendText(chatId, "Замовлень немає.");
+                        break;
+                    }
+
                     Long orderUserId = new ArrayList<>(userOrders.keySet()).get(0); // перший користувач
-                    Map<String, Object> order = userOrders.get(orderUserId).get(idx);
+                    List<Map<String, Object>> ordersList = userOrders.get(orderUserId);
+                    if (ordersList.isEmpty()) {
+                        sendText(chatId, "Замовлень немає.");
+                        break;
+                    }
+
+                    Map<String, Object> order = ordersList.get(idx);
 
                     // Надсилаємо користувачу повідомлення
                     sendText(orderUserId.toString(), "✅ Ваше замовлення підтверджено! Очікуйте доставку.");
@@ -512,19 +523,19 @@ public class StoreBot extends TelegramLongPollingBot {
                     OrderFileManager.updateOrderStatus(order.get("orderCode").toString(), "Підтверджено", "");
 
                     // Видаляємо замовлення з пам'яті
-                    userOrders.get(orderUserId).remove(idx);
+                    ordersList.remove(idx);
 
                     sendText(chatId, "Замовлення підтверджено ✅");
 
                     // Оновлюємо відображення адміну
-                    if (userOrders.get(orderUserId).isEmpty()) {
+                    if (ordersList.isEmpty()) {
                         sendText(chatId, "Замовлень немає.");
                     } else {
                         showAdminOrder(userId, chatId);
                     }
                 }
 
-                case "❌ Відхилити замовлення" -> {
+                case "❌ Відхилити" -> {
                     userStates.put(userId, "reject_order_reason");
                     sendText(chatId, "✏️ Введіть причину відхилення замовлення:");
                 }
@@ -862,23 +873,34 @@ public class StoreBot extends TelegramLongPollingBot {
 
             // ← Додаємо обробку стану відхилення замовлення
             case "reject_order_reason" -> {
-                String reason = text; // текст, який ввів адміністратор
                 int idx = adminOrderIndex.getOrDefault(userId, 0);
-                Long orderUserId = new ArrayList<>(userOrders.keySet()).get(0);
-                Map<String, Object> order = userOrders.get(orderUserId).get(idx);
+                if (userOrders.isEmpty()) {
+                    sendText(chatId, "Замовлень немає.");
+                    break;
+                }
 
+                Long orderUserId = new ArrayList<>(userOrders.keySet()).get(0);
+                List<Map<String, Object>> ordersList = userOrders.get(orderUserId);
+                if (ordersList.isEmpty()) {
+                    sendText(chatId, "Замовлень немає.");
+                    break;
+                }
+
+                Map<String, Object> order = ordersList.get(idx);
+
+                String reason = text; // текст, який ввів адміністратор
                 sendText(orderUserId.toString(), "❌ Ваше замовлення відхилено.\nПричина: " + reason);
 
                 // Оновлюємо файл і статус
                 OrderFileManager.updateOrderStatus(order.get("orderCode").toString(), "Відхилено", reason);
 
                 // Видаляємо замовлення з пам'яті
-                userOrders.get(orderUserId).remove(idx);
+                ordersList.remove(idx);
 
                 sendText(chatId, "Замовлення відхилено ✅");
 
                 // Оновлюємо відображення адміну
-                if (userOrders.get(orderUserId).isEmpty()) {
+                if (ordersList.isEmpty()) {
                     sendText(chatId, "Замовлень немає.");
                 } else {
                     showAdminOrder(userId, chatId);
