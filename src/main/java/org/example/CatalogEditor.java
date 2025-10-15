@@ -208,37 +208,21 @@ public class CatalogEditor {
             }
 
             Yaml yaml = new Yaml();
-            Object data = yaml.load(inputStream);
-
-            List<Map<String, Object>> products;
-
-            if (data instanceof List) {
-                products = (List<Map<String, Object>>) data;
-            } else if (data instanceof Map) {
-                Map<String, Object> map = (Map<String, Object>) data;
-                products = (List<Map<String, Object>>) map.get("products");
-                if (products == null) {
-                    System.out.println("DEBUG: 'products' key not found in catalog.yml");
-                    return 0.0;
-                }
-            } else {
-                System.out.println("DEBUG: catalog.yml root element is neither a list nor a map");
-                return 0.0;
-            }
+            List<Map<String, Object>> products = yaml.load(inputStream);
 
             for (Map<String, Object> product : products) {
                 Object nameObj = product.get("name");
                 if (nameObj == null) continue;
 
                 String name = nameObj.toString().trim();
-                System.out.println("DEBUG: Checking YAML product name: '" + name + "' against '" + productName + "'");
 
+                // Перевірка тільки коли є точне або близьке співпадіння
                 if (name.equalsIgnoreCase(productName.trim()) || name.contains(productName.trim())) {
                     Object priceObj = product.get("price");
                     if (priceObj != null) {
                         try {
                             double price = Double.parseDouble(priceObj.toString().replace(",", ".").trim());
-                            System.out.println("DEBUG: Found price = " + price);
+                            System.out.println("DEBUG: Found price for '" + productName + "' = " + price);
                             return price;
                         } catch (NumberFormatException e) {
                             e.printStackTrace();
@@ -254,7 +238,7 @@ public class CatalogEditor {
         }
 
         System.out.println("DEBUG: Product '" + productName + "' not found in YAML");
-        return 0.0;
+        return 0.0; // дефолтна ціна
     }
 
     // --- Перевірка існування підкатегорії
