@@ -6,9 +6,9 @@ import java.sql.SQLException;
 
 public class DatabaseManager {
 
-    private static final String URL = "jdbc:mysql://shortline.proxy.rlwy.net:59768/railway";
+    private static final String URL = "jdbc:mysql://shortline.proxy.rlwy.net:47335/railway";
     private static final String USER = "root";
-    private static final String PASSWORD = "bNhtxmMdEfRGKAfbbLpwZzDOcbwXKfhG";
+    private static final String PASSWORD = "nbCdXDRidfSuqihKcrojQpSRvArTMwTG";
 
     private static Connection connection;
 
