@@ -20,6 +20,10 @@ import java.io.FileOutputStream;
 import java.net.URL;
 import java.util.*;
 import java.util.List;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 
 public class StoreBot extends TelegramLongPollingBot {
@@ -1874,22 +1878,35 @@ public class StoreBot extends TelegramLongPollingBot {
                 sendText(chatId, "✏️ Введіть ID запрошення, яке хочете видалити:");
             }
             case "📄 Показати всі запрошення" -> {
-                Map<Integer, Map<String, Object>> invitesMap = DeveloperFileManager.getAllInvites(); // Map<Integer, Map<String,Object>>
-                if (invitesMap.isEmpty()) {
-                    sendText(chatId, "Поки що немає запрошень.");
-                } else {
+                String sql = "SELECT * FROM invites ORDER BY id ASC";
+
+                try (Connection conn = DatabaseManager.getConnection();
+                     PreparedStatement stmt = conn.prepareStatement(sql);
+                     ResultSet rs = stmt.executeQuery()) {
+
                     StringBuilder sb = new StringBuilder("🔗 Список запрошень:\n");
-                    for (Map.Entry<Integer, Map<String, Object>> entry : invitesMap.entrySet()) {
-                        Map<String, Object> inv = entry.getValue();
-                        sb.append("ID: ").append(inv.get("id"))
-                                .append(", Name: ").append(inv.get("name"))
-                                .append(", Kasa: ").append(inv.get("kasa"))
-                                .append(", City: ").append(inv.get("city"))
-                                .append(", Invite: ").append(inv.get("invite"))
-                                .append(", Number: ").append(inv.get("number"))
+                    boolean hasInvites = false;
+
+                    while (rs.next()) {
+                        hasInvites = true;
+                        sb.append("ID: ").append(rs.getInt("id"))
+                                .append(", Name: ").append(rs.getString("name"))
+                                .append(", Kasa: ").append(rs.getString("kasa"))
+                                .append(", City: ").append(rs.getString("city"))
+                                .append(", Invite: ").append(rs.getString("invite"))
+                                .append(", Number: ").append(rs.getInt("number"))
                                 .append("\n");
                     }
-                    sendText(chatId, sb.toString());
+
+                    if (!hasInvites) {
+                        sendText(chatId, "Поки що немає запрошень.");
+                    } else {
+                        sendText(chatId, sb.toString());
+                    }
+
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "❌ Сталася помилка при отриманні запрошень.");
                 }
             }
             case "⬅️ Назад в розробника" -> sendMessage(createDeveloperMenu(chatId));
