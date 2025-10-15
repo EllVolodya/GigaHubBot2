@@ -593,7 +593,6 @@ public class StoreBot extends TelegramLongPollingBot {
                     showAdminOrder(userId, chatId);
                 }
                 case "⬅️ Назад (Продавець)" -> {
-                    adminOrderIndex.remove(userId); // очищаємо індекс
                     sendMessage(createAdminMenu(chatId)); // показуємо меню продавця
                 }
 
