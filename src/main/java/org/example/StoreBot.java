@@ -1335,7 +1335,7 @@ public class StoreBot extends TelegramLongPollingBot {
                                         .append("👤 Ім'я: ").append(rs.getString("name")).append("\n")
                                         .append("💰 Каса: ").append(rs.getString("kasa")).append("\n")
                                         .append("🏙️ Місто: ").append(rs.getString("city")).append("\n")
-                                        .append("📈 Кількість переходів: ").append(rs.getInt("number")).append("\n")
+                                        .append("📈 Кількість приєднались: ").append(rs.getInt("number")).append("\n")
                                         .append("-----------------------------\n");
                             }
 
