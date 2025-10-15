@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 
 public class StoreBot extends TelegramLongPollingBot {
 
-    private final String botUsername = "GIGAHUBBOT";
+    private final String botUsername = "GigaHubAssistant_bot";
 
     // 🔹 Користувацькі стани
     private final Map<Long, String> currentCategory = new HashMap<>();
