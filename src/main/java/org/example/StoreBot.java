@@ -877,8 +877,8 @@ public class StoreBot extends TelegramLongPollingBot {
                 String reason = text; // текст, який ввів адміністратор
 
                 try (Connection conn = DatabaseManager.getConnection()) {
-                    // Беремо перше замовлення з бази для цього адміністратора
-                    String sql = "SELECT * FROM orders ORDER BY id ASC LIMIT 1";
+                    // Беремо перше замовлення з бази
+                    String sql = "SELECT * FROM orders WHERE status != 'Підтверджено' AND status != 'Відхилено' ORDER BY id ASC LIMIT 1";
                     try (PreparedStatement stmt = conn.prepareStatement(sql);
                          ResultSet rs = stmt.executeQuery()) {
 
@@ -892,16 +892,19 @@ public class StoreBot extends TelegramLongPollingBot {
                             Long orderUserId = rs.getLong("userId");
                             String orderCode = rs.getString("orderCode");
 
-                            // Відправляємо повідомлення користувачу
+                            // Відправляємо користувачу повідомлення про відхилення
                             sendText(orderUserId.toString(), "❌ Ваше замовлення відхилено.\nПричина: " + reason);
 
-                            // Оновлюємо статус у базі
-                            String updateSql = "UPDATE orders SET status = ?, reason = ? WHERE orderCode = ?";
+                            // Оновлюємо статус і коментар у базі
+                            String updateSql = "UPDATE orders SET status = ?, comment = ? WHERE orderCode = ?";
                             try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
                                 updateStmt.setString(1, "Відхилено");
                                 updateStmt.setString(2, reason);
                                 updateStmt.setString(3, orderCode);
-                                updateStmt.executeUpdate();
+                                int rows = updateStmt.executeUpdate();
+                                if (rows == 0) {
+                                    sendText(chatId, "❌ Не вдалося оновити замовлення у базі.");
+                                }
                             }
 
                             // Повідомляємо адміну
