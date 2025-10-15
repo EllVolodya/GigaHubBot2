@@ -210,4 +210,19 @@ public class CatalogEditor {
 
         return "0"; // дефолтна ціна, якщо продукт не знайдено
     }
+
+    public static boolean subcategoryExists(String subcategoryName) {
+        String sql = "SELECT id FROM subcategories WHERE name = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, subcategoryName);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 }

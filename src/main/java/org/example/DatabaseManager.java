@@ -10,15 +10,17 @@ public class DatabaseManager {
     private static final String USER = "root";
     private static final String PASSWORD = "bNhtxmMdEfRGKAfbbLpwZzDOcbwXKfhG";
 
+    private static Connection connection;
+
     // --- Підключення до бази
     public static void connect() {
         try {
-            Class.forName("com.mysql.cj.jdbc.Driver");
-            // Тестове підключення
-            try (Connection conn = DriverManager.getConnection(URL, USER, PASSWORD)) {
-                if (conn != null) {
-                    System.out.println("✅ Database connected successfully!");
-                }
+            if (connection == null || connection.isClosed()) {
+                Class.forName("com.mysql.cj.jdbc.Driver");
+                connection = DriverManager.getConnection(URL, USER, PASSWORD);
+                System.out.println("✅ Database connected successfully!");
+            } else {
+                System.out.println("ℹ️ Database already connected.");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -26,14 +28,23 @@ public class DatabaseManager {
         }
     }
 
-    // --- Отримати нове з'єднання
+    // --- Отримати підключення (автоматично перепідключається, якщо закрите)
     public static Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(URL, USER, PASSWORD);
+        if (connection == null || connection.isClosed()) {
+            connect();
+        }
+        return connection;
     }
 
-    // --- Відключення (для сумісності)
+    // --- Відключення бази
     public static void disconnect() {
-        // Нічого не робимо, бо getConnection() відкриває нове підключення кожного разу
-        System.out.println("🔌 Disconnect not needed: connections auto-closed after use.");
+        try {
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+                System.out.println("🔌 Database disconnected.");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 }

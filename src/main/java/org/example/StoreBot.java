@@ -1737,13 +1737,20 @@ public class StoreBot extends TelegramLongPollingBot {
         String price = CatalogEditor.getProductPriceFromYAML(productName);
         if (price == null || price.isEmpty()) price = "0"; // дефолтна ціна
 
+        // Перевіряємо підкатегорію
+        if (!CatalogEditor.subcategoryExists(subcategoryName)) {
+            sendText(chatId, "❌ Підкатегорія '" + subcategoryName + "' не знайдена у базі MySQL.");
+            userStates.remove(userId);
+            return;
+        }
+
         boolean success = CatalogEditor.addProductToSubcategory(productName, price, subcategoryName);
 
         if (success) {
             sendText(chatId, "✅ Товар '" + productName + "' додано у підкатегорію '" + subcategoryName + "'!");
         } else {
             sendText(chatId, "❌ Не вдалося додати товар '" + productName +
-                    "' у підкатегорію '" + subcategoryName + "'. Перевірте назву підкатегорії або наявність товару у YAML.");
+                    "' у підкатегорію '" + subcategoryName + "'. Можливо, товар вже існує.");
         }
 
         userStates.remove(userId);
