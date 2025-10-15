@@ -187,6 +187,20 @@ public class StoreBot extends TelegramLongPollingBot {
                     Long chatIdLong = update.getMessage().getChatId();
                     String chatIdStr = chatIdLong.toString(); // для createUserMenu, якщо потрібен String
 
+                    String inviteCode = null;
+
+                    // Перевіряємо, чи є параметр invite після пробілу
+                    if (text != null && text.contains("")) {
+                        inviteCode = text.split(" ")[1].trim();
+
+                        // Збільшуємо лічильник number для цього invite
+                        if (InviteManager.incrementInviteNumber(inviteCode)) {
+                            System.out.println("✅ Лічильник number для invite " + inviteCode + " збільшено.");
+                        } else {
+                            System.out.println("❌ Invite не знайдено: " + inviteCode);
+                        }
+                    }
+
                     // Додаємо користувача у REGISTERED_USERS
                     UserManager userManager = new UserManager();
                     userManager.registerUser(chatIdLong); // передаємо Long
@@ -194,8 +208,10 @@ public class StoreBot extends TelegramLongPollingBot {
                     // Відправка головного меню
                     sendMessage(createUserMenu(chatIdStr, userId));
 
-                    System.out.println("Користувач натиснув /start: " + chatIdLong);
+                    System.out.println("Користувач натиснув /start: " + chatIdLong +
+                            (inviteCode != null ? " (Invite: " + inviteCode + ")" : ""));
                 }
+
                 case "🧱 Каталог товарів" -> sendCategories(userId);
                 case "📋 Кошик" -> {
                     try {
@@ -1307,23 +1323,25 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
             }
 
-            // Додати нове запрошення
+            // --- Додати нове запрошення
             case "add_invite" -> {
                 String[] parts = text.split(";");
                 if (parts.length < 3) {
                     sendText(chatId, "❌ Некоректний формат! Використовуйте Name;Kasa;City");
                 } else {
-                    DeveloperFileManager.addInvite(parts[0], parts[1], parts[2], botUsername);
-                    sendText(chatId, "✅ Запрошення додано!");
+                    boolean success = InviteManager.addInvite(parts[0], parts[1], parts[2], botUsername);
+                    if (success) sendText(chatId, "✅ Запрошення додано!");
+                    else sendText(chatId, "❌ Сталася помилка при додаванні запрошення.");
                 }
                 userStates.remove(userId);
             }
 
-            // Видалити запрошення
+            // --- Видалити запрошення
             case "delete_invite" -> {
                 try {
                     int id = Integer.parseInt(text.trim());
-                    if (DeveloperFileManager.deleteInvite(id)) sendText(chatId, "✅ Запрошення видалено!");
+                    boolean deleted = InviteManager.deleteInvite(id); // потрібно додати метод у InviteManager
+                    if (deleted) sendText(chatId, "✅ Запрошення видалено!");
                     else sendText(chatId, "❌ Запрошення не знайдено.");
                 } catch (Exception e) {
                     sendText(chatId, "❌ Некоректний ID!");
@@ -1331,7 +1349,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 userStates.remove(userId);
             }
 
-            // Редагувати запрошення
+            // --- Редагувати запрошення
             case "edit_invite" -> {
                 String[] parts = text.split(";");
                 if (parts.length < 4) {
@@ -1339,15 +1357,16 @@ public class StoreBot extends TelegramLongPollingBot {
                 } else {
                     try {
                         int id = Integer.parseInt(parts[0]);
-                        if (DeveloperFileManager.editInvite(id, parts[1], parts[2], parts[3])) {
-                            sendText(chatId, "✅ Запрошення відредаговано!");
-                        } else sendText(chatId, "❌ Запрошення не знайдено!");
+                        boolean edited = InviteManager.editInvite(id, parts[1], parts[2], parts[3]); // потрібно додати метод у InviteManager
+                        if (edited) sendText(chatId, "✅ Запрошення відредаговано!");
+                        else sendText(chatId, "❌ Запрошення не знайдено!");
                     } catch (Exception e) {
                         sendText(chatId, "❌ Некоректний ID!");
                     }
                 }
                 userStates.remove(userId);
             }
+
 
             case "logs_invites" -> {
                 Map<Integer, Map<String, Object>> invites = DeveloperFileManager.getAllInvites();
