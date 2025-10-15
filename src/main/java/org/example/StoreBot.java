@@ -2552,21 +2552,24 @@ public class StoreBot extends TelegramLongPollingBot {
             default -> sb.append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
         }
 
-        // Список товарів
-        List<Map<String, Object>> items = (List<Map<String, Object>>) order.get("item");
-        if (items != null) {
-            double total = 0;
-            int i = 1;
-            for (Map<String, Object> item : items) {
-                String name = item.getOrDefault("name", "Без назви").toString();
-                double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
+        // 🔹 Список товарів — розбираємо рядок item
+        String itemsStr = order.getOrDefault("item", "").toString(); // Назва:Ціна;Назва:Ціна;
+        double total = 0;
+        int i = 1;
+        if (!itemsStr.isEmpty()) {
+            String[] parts = itemsStr.split(";");
+            for (String part : parts) {
+                if (part.isEmpty()) continue;
+                String[] pair = part.split(":");
+                String name = pair[0];
+                double price = pair.length > 1 ? Double.parseDouble(pair[1]) : 0;
                 sb.append(i++).append(". 🛒 ").append(name).append(" — ").append(price).append(" грн\n");
                 total += price;
             }
-            sb.append("\n💰 Всього: ").append(total).append(" грн");
         }
+        sb.append("\n💰 Всього: ").append(total).append(" грн");
 
-        // Кнопки управління замовленням
+        // 🔹 Кнопки управління замовленням
         ReplyKeyboardMarkup kb = new ReplyKeyboardMarkup();
         kb.setResizeKeyboard(true);
         List<KeyboardRow> rows = new ArrayList<>();
