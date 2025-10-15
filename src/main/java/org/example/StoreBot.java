@@ -476,13 +476,26 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 case "🛒 Замовлення користувачів" -> {
-                    if (userOrders.isEmpty()) {
-                        sendText(chatId, "Поки що немає замовлень.");
-                    } else {
-                        // 👉 зберігаємо, що адмін зараз дивиться перше замовлення
+                    try (Connection conn = DatabaseManager.getConnection()) {
+                        // Перевіряємо, чи є замовлення в базі
+                        String countSql = "SELECT COUNT(*) FROM orders";
+                        try (PreparedStatement countStmt = conn.prepareStatement(countSql)) {
+                            ResultSet countRs = countStmt.executeQuery();
+                            if (countRs.next() && countRs.getInt(1) == 0) {
+                                sendText(chatId, "Поки що немає замовлень.");
+                                return;
+                            }
+                        }
+
+                        // Зберігаємо, що адмін зараз дивиться перше замовлення
                         adminOrderIndex.put(userId, 0);
-                        // 👉 показуємо перше замовлення
+
+                        // Показуємо перше замовлення з бази
                         showAdminOrder(userId, chatId);
+
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                        sendText(chatId, "❌ Помилка при завантаженні замовлень з бази.");
                     }
                 }
 
