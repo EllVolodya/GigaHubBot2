@@ -94,7 +94,7 @@ public class CatalogEditor {
         String checkProductSql = "SELECT id FROM products WHERE name = ? AND subcategory_id = ?";
         String insertSql = """
             INSERT INTO products (name, price, unit, description, photo, created_at, subcategory_id)
-            VALUES (?, ?, 'шт', '', '', CURRENT_DATE, ?)
+            VALUES (?, ?, ?, ?, ?, CURRENT_DATE, ?)
             """;
 
         try (Connection conn = DatabaseManager.getConnection();
@@ -116,8 +116,12 @@ public class CatalogEditor {
 
             // Додати товар
             insertStmt.setString(1, productName);
-            insertStmt.setDouble(2, price); // <-- тепер double
-            insertStmt.setInt(3, subcategoryId);
+            insertStmt.setDouble(2, price); // вставляємо double
+            insertStmt.setString(3, "шт"); // default unit
+            insertStmt.setString(4, "");    // default description
+            insertStmt.setString(5, "");    // default photo
+            insertStmt.setInt(6, subcategoryId);
+
             insertStmt.executeUpdate();
 
             System.out.println("✅ Товар '" + productName + "' додано у підкатегорію '" + subcategoryName + "'");
@@ -190,7 +194,6 @@ public class CatalogEditor {
     }
 
     // --- Отримати ціну продукту з YAML
-    // --- Отримати ціну продукту з YAML
     public static double getProductPriceFromYAML(String productName) {
         try (InputStream inputStream = CatalogEditor.class.getClassLoader().getResourceAsStream("products.yaml")) {
             if (inputStream == null) return 0.0;
@@ -204,10 +207,9 @@ public class CatalogEditor {
                     Object priceObj = product.get("price");
                     if (priceObj != null) {
                         if (priceObj instanceof Number) {
-                            return ((Number) priceObj).doubleValue(); // повертаємо double
+                            return ((Number) priceObj).doubleValue();
                         } else {
                             try {
-                                // конвертуємо рядок у double, замінюємо кому на крапку
                                 return Double.parseDouble(priceObj.toString().replace(",", "."));
                             } catch (NumberFormatException e) {
                                 e.printStackTrace();
@@ -222,9 +224,10 @@ public class CatalogEditor {
             e.printStackTrace();
         }
 
-        return 0.0; // дефолтна ціна, якщо продукт не знайдено
+        return 0.0;
     }
 
+    // --- Перевірка існування підкатегорії
     public static boolean subcategoryExists(String subcategoryName) {
         String sql = "SELECT id FROM subcategories WHERE name = ?";
         try (Connection conn = DatabaseManager.getConnection();

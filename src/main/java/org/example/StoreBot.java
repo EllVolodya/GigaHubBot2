@@ -1733,28 +1733,28 @@ public class StoreBot extends TelegramLongPollingBot {
 
         System.out.println("INFO: Додаємо товар '" + productName + "' у підкатегорію '" + subcategoryName + "'");
 
-        // Отримуємо ціну продукту з YAML через CatalogEditor
+        // --- Отримуємо ціну продукту з YAML
         double price = CatalogEditor.getProductPriceFromYAML(productName);
-        // дефолтна ціна, якщо не знайдено або <= 0
-        if (price <= 0.0) price = 0.0;
+        if (price <= 0.0) price = 0.0; // дефолтна ціна
 
-        // Перевіряємо підкатегорію
+        // --- Перевіряємо існування підкатегорії
         if (!CatalogEditor.subcategoryExists(subcategoryName)) {
             sendText(chatId, "❌ Підкатегорія '" + subcategoryName + "' не знайдена у базі MySQL.");
             userStates.remove(userId);
             return;
         }
 
-        // Тепер передаємо ціну як double
+        // --- Додаємо продукт у підкатегорію
         boolean success = CatalogEditor.addProductToSubcategory(productName, price, subcategoryName);
 
         if (success) {
             sendText(chatId, "✅ Товар '" + productName + "' додано у підкатегорію '" + subcategoryName + "'!");
         } else {
             sendText(chatId, "❌ Не вдалося додати товар '" + productName +
-                    "' у підкатегорію '" + subcategoryName + "'. Можливо, товар вже існує.");
+                    "' у підкатегорію '" + subcategoryName + "'. Можливо, товар уже існує.");
         }
 
+        // --- Очищаємо стан користувача
         userStates.remove(userId);
     }
 
