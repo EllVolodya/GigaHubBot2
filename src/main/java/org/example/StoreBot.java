@@ -31,6 +31,7 @@ public class StoreBot extends TelegramLongPollingBot {
     private final Map<Long, String> currentSubcategory = new HashMap<>();
     private final Map<Long, Integer> productIndex = new HashMap<>();
     private final Map<Long, List<Map<String, Object>>> userCart = new HashMap<>();
+    private Map<String, String> productPrices = new HashMap<>();
 
     //Права
     private final List<Long> ADMINS = List.of(620298889L, 533570832L,1030917576L);
@@ -1693,7 +1694,7 @@ public class StoreBot extends TelegramLongPollingBot {
         sendText(chatId, "✏️ Введіть назву підкатегорії для категорії '" + text + "' (можна пропустити, залишивши пустим):");
     }
 
-    private void handleAddSubcategory(Long userId, String chatId, String text) {
+    private void handleAddSubcategory(Long userId, String chatId, String subcategoryName) {
         String categoryName = adminNewCategory.get(userId);
         if (categoryName == null) {
             sendText(chatId, "❌ Сталася помилка. Спробуйте ще раз.");
@@ -1701,10 +1702,22 @@ public class StoreBot extends TelegramLongPollingBot {
             return;
         }
 
-        // Додаємо категорію і підкатегорію у CatalogEditor
-        CatalogEditor.addCategory(categoryName); // ✅
+        // Додаємо категорію у CatalogEditor
+        boolean catAdded = CatalogEditor.addCategory(categoryName);
+        if (!catAdded) {
+            sendText(chatId, "⚠️ Категорія вже існує: " + categoryName);
+        }
 
-        sendText(chatId, "✅ Категорія та підкатегорія додані у каталог:\nКатегорія: " + categoryName + (text.isEmpty() ? "" : "\nПідкатегорія: " + text));
+        // Додаємо підкатегорію, якщо назва підкатегорії не порожня
+        if (subcategoryName != null && !subcategoryName.isEmpty()) {
+            boolean subAdded = CatalogEditor.addSubcategory(categoryName, subcategoryName);
+            if (!subAdded) {
+                sendText(chatId, "⚠️ Підкатегорія вже існує: " + subcategoryName);
+            }
+        }
+
+        sendText(chatId, "✅ Категорія та підкатегорія додані у каталог:\nКатегорія: " + categoryName +
+                (subcategoryName.isEmpty() ? "" : "\nПідкатегорія: " + subcategoryName));
 
         adminNewCategory.remove(userId);
         userStates.remove(userId);
@@ -1720,8 +1733,11 @@ public class StoreBot extends TelegramLongPollingBot {
 
         System.out.println("INFO: Додаємо товар '" + productName + "' у підкатегорію '" + subcategoryName + "'");
 
-        // Використовуємо метод, який бере price із products у YAML
-        boolean success = CatalogEditor.addProductToSubcategory(productName, subcategoryName);
+        // Отримуємо ціну продукту з YAML через CatalogEditor
+        String price = CatalogEditor.getProductPriceFromYAML(productName);
+        if (price == null || price.isEmpty()) price = "0"; // дефолтна ціна
+
+        boolean success = CatalogEditor.addProductToSubcategory(productName, price, subcategoryName);
 
         if (success) {
             sendText(chatId, "✅ Товар '" + productName + "' додано у підкатегорію '" + subcategoryName + "'!");
