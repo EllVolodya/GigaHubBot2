@@ -7,34 +7,49 @@ import java.util.*;
 
 public class OrderFileManager {
 
-    // --- Додати нове замовлення
+    // --- Add a new order
     public static boolean addOrder(Map<String, Object> orderData) {
-        // Генеруємо рядок item для БД і рахуємо total
+        System.out.println("[addOrder] Starting to add order: " + orderData);
+
+        // Generate item string for DB and calculate total
         List<Map<String, Object>> cart = (List<Map<String, Object>>) orderData.get("items");
         StringBuilder itemsDb = new StringBuilder();
         double total = 0;
+
         if (cart != null) {
             for (Map<String, Object> item : cart) {
-                String name = item.getOrDefault("name", item.getOrDefault("title", "Без назви")).toString();
-                double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
+                String name = item.getOrDefault("name", item.getOrDefault("title", "Unnamed")).toString();
+                double price = 0;
+                Object priceObj = item.get("price");
+                try {
+                    if (priceObj instanceof Number n) price = n.doubleValue();
+                    else if (priceObj != null) price = Double.parseDouble(priceObj.toString());
+                } catch (NumberFormatException e) {
+                    System.err.println("[addOrder] Cannot parse price: " + priceObj);
+                }
                 itemsDb.append(name).append(":").append(price).append(";");
                 total += price;
             }
         }
 
-        orderData.put("item", itemsDb.toString()); // для TEXT колонки
-        orderData.put("total", total);             // підрахунок total
+        System.out.println("[addOrder] Generated itemsDb = " + itemsDb);
+        System.out.println("[addOrder] Total amount = " + total);
 
-        String sql = "INSERT INTO orders " +
-                "(orderCode, userId, deliveryType, city, address, postOffice, " +
-                "fullName, phone, card, status, comment, total, item, date) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        orderData.put("item", itemsDb.toString());
+        orderData.put("total", total);
+
+        String sql = """
+                INSERT INTO orders 
+                (orderCode, userId, deliveryType, city, address, postOffice, 
+                fullName, phone, card, status, comment, total, item, date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, (String) orderData.get("orderCode"));
-            stmt.setInt(2, (Integer) orderData.get("userId"));
+            stmt.setLong(2, Long.parseLong(orderData.get("userId").toString()));
             stmt.setString(3, (String) orderData.getOrDefault("deliveryType", null));
             stmt.setString(4, (String) orderData.getOrDefault("city", null));
             stmt.setString(5, (String) orderData.getOrDefault("address", null));
@@ -42,70 +57,59 @@ public class OrderFileManager {
             stmt.setString(7, (String) orderData.getOrDefault("fullName", null));
             stmt.setString(8, (String) orderData.getOrDefault("phone", null));
             stmt.setString(9, (String) orderData.getOrDefault("card", null));
-            stmt.setString(10, (String) orderData.getOrDefault("status", "Нове"));
+            stmt.setString(10, (String) orderData.getOrDefault("status", "New"));
             stmt.setString(11, (String) orderData.getOrDefault("comment", ""));
-            stmt.setDouble(12, total);               // підрахований total
-            stmt.setString(13, itemsDb.toString());  // TEXT item
+            stmt.setDouble(12, total);
+            stmt.setString(13, itemsDb.toString());
             stmt.setDate(14, Date.valueOf(LocalDate.now()));
 
-            stmt.executeUpdate();
-            System.out.println("✅ Нове замовлення додано: " + orderData.get("orderCode"));
+            int rows = stmt.executeUpdate();
+            System.out.println("[addOrder] Rows inserted: " + rows);
             return true;
+
         } catch (SQLException e) {
-            System.err.println("❌ Помилка при додаванні замовлення: " + e.getMessage());
+            System.err.println("[addOrder] SQL error: " + e.getMessage());
             return false;
         }
     }
 
-    // --- Оновити статус замовлення
+    // --- Update order status
     public static boolean updateOrderStatus(String orderCode, String status, String comment) {
+        System.out.println("[updateOrderStatus] OrderCode: " + orderCode + ", Status: " + status + ", Comment: " + comment);
         String sql = "UPDATE orders SET status = ?, comment = ? WHERE orderCode = ?";
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-
             stmt.setString(1, status);
             stmt.setString(2, comment);
             stmt.setString(3, orderCode);
-
             int updated = stmt.executeUpdate();
-            if (updated > 0) {
-                System.out.println("✅ Статус оновлено для замовлення: " + orderCode);
-                return true;
-            } else {
-                System.out.println("⚠️ Замовлення не знайдено: " + orderCode);
-                return false;
-            }
+            System.out.println("[updateOrderStatus] Rows updated: " + updated);
+            return updated > 0;
         } catch (SQLException e) {
-            System.err.println("❌ Помилка при оновленні статусу: " + e.getMessage());
+            System.err.println("[updateOrderStatus] SQL error: " + e.getMessage());
             return false;
         }
     }
 
-    // --- Видалити замовлення
+    // --- Delete order
     public static boolean deleteOrder(String orderCode) {
+        System.out.println("[deleteOrder] Deleting order: " + orderCode);
         String sql = "DELETE FROM orders WHERE orderCode = ?";
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-
             stmt.setString(1, orderCode);
             int deleted = stmt.executeUpdate();
-
-            if (deleted > 0) {
-                System.out.println("🗑️ Замовлення видалено: " + orderCode);
-                return true;
-            } else {
-                System.out.println("⚠️ Замовлення не знайдено: " + orderCode);
-                return false;
-            }
-
+            System.out.println("[deleteOrder] Rows deleted: " + deleted);
+            return deleted > 0;
         } catch (SQLException e) {
-            System.err.println("❌ Помилка при видаленні: " + e.getMessage());
+            System.err.println("[deleteOrder] SQL error: " + e.getMessage());
             return false;
         }
     }
 
-    // --- Отримати всі замовлення
+    // --- Get all orders
     public static List<Map<String, Object>> getOrders() {
+        System.out.println("[getOrders] Loading all orders...");
         List<Map<String, Object>> orders = new ArrayList<>();
         String sql = "SELECT * FROM orders ORDER BY id DESC";
 
@@ -117,7 +121,7 @@ public class OrderFileManager {
                 Map<String, Object> order = new LinkedHashMap<>();
                 order.put("id", rs.getInt("id"));
                 order.put("orderCode", rs.getString("orderCode"));
-                order.put("userId", rs.getInt("userId"));
+                order.put("userId", rs.getLong("userId"));
                 order.put("deliveryType", rs.getString("deliveryType"));
                 order.put("city", rs.getString("city"));
                 order.put("address", rs.getString("address"));
@@ -129,15 +133,20 @@ public class OrderFileManager {
                 order.put("comment", rs.getString("comment"));
                 order.put("total", rs.getDouble("total"));
                 order.put("date", rs.getDate("date"));
-                order.put("item", rs.getString("item")); // для адмін-повідомлень
+                order.put("item", rs.getString("item"));
+
+                System.out.println("[getOrders] Fetched order: code=" + order.get("orderCode")
+                        + ", total=" + order.get("total")
+                        + ", item=" + order.get("item"));
+
                 orders.add(order);
             }
 
-            System.out.println("📦 Завантажено замовлень: " + orders.size());
-        } catch (SQLException e) {
-            System.err.println("❌ Помилка при завантаженні замовлень: " + e.getMessage());
-        }
+            System.out.println("[getOrders] Total orders loaded: " + orders.size());
 
+        } catch (SQLException e) {
+            System.err.println("[getOrders] SQL error: " + e.getMessage());
+        }
         return orders;
     }
 }
