@@ -200,6 +200,7 @@ public class CatalogEditor {
         }
     }
 
+    // --- Отримати ціну продукту з YAML
     public static double getProductPriceFromYAML(String productName) {
         try (InputStream inputStream = CatalogEditor.class.getClassLoader().getResourceAsStream("catalog.yml")) {
             if (inputStream == null) {
@@ -208,15 +209,21 @@ public class CatalogEditor {
             }
 
             Yaml yaml = new Yaml();
-            List<Map<String, Object>> products = yaml.load(inputStream);
+            Map<String, Object> data = yaml.load(inputStream); // отримуємо кореневу карту
+
+            Object productsObj = data.get("products"); // беремо список продуктів
+            if (!(productsObj instanceof List)) {
+                System.out.println("DEBUG: 'products' key is missing or not a list");
+                return 0.0;
+            }
+
+            List<Map<String, Object>> products = (List<Map<String, Object>>) productsObj;
 
             for (Map<String, Object> product : products) {
                 Object nameObj = product.get("name");
                 if (nameObj == null) continue;
 
                 String name = nameObj.toString().trim();
-
-                // Перевірка тільки коли є точне або близьке співпадіння
                 if (name.equalsIgnoreCase(productName.trim()) || name.contains(productName.trim())) {
                     Object priceObj = product.get("price");
                     if (priceObj != null) {
@@ -238,7 +245,7 @@ public class CatalogEditor {
         }
 
         System.out.println("DEBUG: Product '" + productName + "' not found in YAML");
-        return 0.0; // дефолтна ціна
+        return 0.0;
     }
 
     // --- Перевірка існування підкатегорії
