@@ -2491,32 +2491,30 @@ public class StoreBot extends TelegramLongPollingBot {
                     .append("👤 П.І.: ").append(order.getOrDefault("fullName", "Невідомо")).append("\n")
                     .append("📞 Телефон: ").append(order.getOrDefault("phone", "Невідомо")).append("\n")
                     .append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
-
-            case "Доставка по місту" -> sb.append("🏠 Місто/Адреса: ").append(order.getOrDefault("address", "Невідомо")).append("\n")
+            case "Доставка по місту" -> sb.append("🏠 Адреса: ").append(order.getOrDefault("address", "Невідомо")).append("\n")
                     .append("👤 П.І.: ").append(order.getOrDefault("fullName", "Невідомо")).append("\n")
                     .append("📞 Телефон: ").append(order.getOrDefault("phone", "Невідомо")).append("\n")
                     .append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
-
             case "Нова пошта" -> sb.append("📮 Відділення НП: ").append(order.getOrDefault("postOffice", "Невідомо")).append("\n")
                     .append("👤 П.І.: ").append(order.getOrDefault("fullName", "Невідомо")).append("\n")
                     .append("📞 Телефон: ").append(order.getOrDefault("phone", "Невідомо")).append("\n")
                     .append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
-
             default -> sb.append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
         }
 
         // Список товарів
         List<Map<String, Object>> items = (List<Map<String, Object>>) order.get("items");
-        double total = 0;
-        int i = 1;
-        for (Map<String, Object> item : items) {
-            String name = item.getOrDefault("name", "Без назви").toString();
-            double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
-            sb.append(i++).append(". 🛒 ").append(name).append(" — ").append(price).append(" грн\n");
-            total += price;
+        if (items != null) {
+            double total = 0;
+            int i = 1;
+            for (Map<String, Object> item : items) {
+                String name = item.getOrDefault("name", "Без назви").toString();
+                double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
+                sb.append(i++).append(". 🛒 ").append(name).append(" — ").append(price).append(" грн\n");
+                total += price;
+            }
+            sb.append("\n💰 Всього: ").append(total).append(" грн");
         }
-
-        sb.append("\n💰 Всього: ").append(total).append(" грн");
 
         // Кнопки управління замовленням
         ReplyKeyboardMarkup kb = new ReplyKeyboardMarkup();
@@ -2584,16 +2582,30 @@ public class StoreBot extends TelegramLongPollingBot {
 
     // 🔹 Показує одне замовлення адміну з кнопками
     private void showAdminOrder(Long adminId, String chatId) {
-        // Отримуємо поточний індекс для адміна
-        int idx = adminOrderIndex.getOrDefault(adminId, 0);
-
+        // Перевіряємо, чи є замовлення
         if (userOrders.isEmpty()) {
             sendText(chatId, "Замовлень немає.");
             return;
         }
 
-        // Беремо першого користувача зі списку (можна розширити, щоб переглядати всіх користувачів)
-        Long orderUserId = new ArrayList<>(userOrders.keySet()).get(0);
+        // Отримуємо список всіх userId, у яких є замовлення
+        List<Long> usersWithOrders = new ArrayList<>();
+        for (Map.Entry<Long, List<Map<String, Object>>> entry : userOrders.entrySet()) {
+            if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+                usersWithOrders.add(entry.getKey());
+            }
+        }
+
+        if (usersWithOrders.isEmpty()) {
+            sendText(chatId, "Замовлень немає.");
+            return;
+        }
+
+        // Індекс замовлення для конкретного адміна
+        int idx = adminOrderIndex.getOrDefault(adminId, 0);
+
+        // Отримуємо userId, який відповідає поточному індексу
+        Long orderUserId = usersWithOrders.get(idx % usersWithOrders.size());
         List<Map<String, Object>> orders = userOrders.get(orderUserId);
 
         if (orders == null || orders.isEmpty()) {
@@ -2601,18 +2613,10 @@ public class StoreBot extends TelegramLongPollingBot {
             return;
         }
 
-        // Якщо індекс за межами списку, повертаємося на початок
-        if (idx >= orders.size()) {
-            idx = 0;
-        }
+        // Беремо перше замовлення (можна додати перегортання між замовленнями користувача)
+        Map<String, Object> order = orders.get(0);
 
-        // Зберігаємо актуальний індекс
-        adminOrderIndex.put(adminId, idx);
-
-        // Беремо замовлення
-        Map<String, Object> order = orders.get(idx);
-
-        // Відправляємо повідомлення адміну з меню замовлення
+        // Відправляємо адміну
         sendMessage(createOrderAdminMenu(chatId, order, orderUserId));
     }
 
