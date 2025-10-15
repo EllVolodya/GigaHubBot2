@@ -502,7 +502,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
                 case "✅ Підтвердити" -> {
                     try (Connection conn = DatabaseManager.getConnection()) {
-                        // Витягаємо перше нове замовлення з бази для цього адміну
+                        // Витягаємо перше нове замовлення з бази
                         String selectSql = "SELECT * FROM orders WHERE status = 'Нове' ORDER BY id ASC LIMIT 1";
                         try (PreparedStatement stmt = conn.prepareStatement(selectSql);
                              ResultSet rs = stmt.executeQuery()) {
