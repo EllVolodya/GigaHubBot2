@@ -1726,35 +1726,43 @@ public class StoreBot extends TelegramLongPollingBot {
     private void handleAddToSubcategory(Long userId, String chatId, String subcategoryName) {
         String productName = adminEditingProduct.get(userId);
         if (productName == null) {
-            sendText(chatId, "❌ Помилка: не вибрано товар для додавання у підкатегорію.");
+            sendText(chatId, "❌ Error: No product selected to add to the subcategory.");
             userStates.remove(userId);
             return;
         }
 
-        System.out.println("INFO: Додаємо товар '" + productName + "' у підкатегорію '" + subcategoryName + "'");
+        System.out.println("INFO: Adding product '" + productName + "' to subcategory '" + subcategoryName + "'");
 
-        // --- Отримуємо ціну продукту з YAML
+        // --- Get product price from YAML
         double price = CatalogEditor.getProductPriceFromYAML(productName);
-        if (price <= 0.0) price = 0.0; // дефолтна ціна
+        System.out.println("DEBUG: Price from YAML for '" + productName + "' = " + price);
 
-        // --- Перевіряємо існування підкатегорії
-        if (!CatalogEditor.subcategoryExists(subcategoryName)) {
-            sendText(chatId, "❌ Підкатегорія '" + subcategoryName + "' не знайдена у базі MySQL.");
+        if (price <= 0.0) {
+            System.out.println("DEBUG: Price <= 0, setting default 0.0");
+            price = 0.0;
+        }
+
+        // --- Check if subcategory exists
+        boolean subExists = CatalogEditor.subcategoryExists(subcategoryName);
+        System.out.println("DEBUG: Does subcategory '" + subcategoryName + "' exist? " + subExists);
+        if (!subExists) {
+            sendText(chatId, "❌ Subcategory '" + subcategoryName + "' not found in MySQL database.");
             userStates.remove(userId);
             return;
         }
 
-        // --- Додаємо продукт у підкатегорію
+        // --- Add product to subcategory
+        System.out.println("DEBUG: Calling addProductToSubcategory with price = " + price);
         boolean success = CatalogEditor.addProductToSubcategory(productName, price, subcategoryName);
 
         if (success) {
-            sendText(chatId, "✅ Товар '" + productName + "' додано у підкатегорію '" + subcategoryName + "'!");
+            sendText(chatId, "✅ Product '" + productName + "' added to subcategory '" + subcategoryName + "'!");
         } else {
-            sendText(chatId, "❌ Не вдалося додати товар '" + productName +
-                    "' у підкатегорію '" + subcategoryName + "'. Можливо, товар уже існує.");
+            sendText(chatId, "❌ Failed to add product '" + productName +
+                    "' to subcategory '" + subcategoryName + "'. It might already exist.");
         }
 
-        // --- Очищаємо стан користувача
+        // --- Clean up user state
         userStates.remove(userId);
     }
 
