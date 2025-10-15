@@ -582,6 +582,21 @@ public class StoreBot extends TelegramLongPollingBot {
                     }
                 }
 
+                case "⏭️ Дальше" -> {
+                    int idx = adminOrderIndex.getOrDefault(userId, 0);
+                    adminOrderIndex.put(userId, idx + 1); // переходимо до наступного
+                    showAdminOrder(userId, chatId);
+                }
+                case "⏮️ Назад" -> {
+                    int idx = adminOrderIndex.getOrDefault(userId, 0);
+                    if (idx > 0) adminOrderIndex.put(userId, idx - 1); // повертаємося назад
+                    showAdminOrder(userId, chatId);
+                }
+                case "⬅️ Назад (Продавець)" -> {
+                    adminOrderIndex.remove(userId); // очищаємо індекс
+                    createAdminMenu(chatId); // показуємо меню продавця
+                }
+
                 case "➡️ Далі" -> {
                     int idx = adminOrderIndex.getOrDefault(userId, 0);
                     idx++;
@@ -2585,24 +2600,27 @@ public class StoreBot extends TelegramLongPollingBot {
         }
         sb.append("\n💰 Всього: ").append(total).append(" грн");
 
-        // 🔹 Кнопки як ряди під повідомленням
+        // 🔹 Кнопки
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         keyboardMarkup.setResizeKeyboard(true);
         keyboardMarkup.setOneTimeKeyboard(false);
 
         List<KeyboardRow> keyboard = new ArrayList<>();
 
-        // Ряд з підтвердженням і відхиленням
         KeyboardRow row1 = new KeyboardRow();
         row1.add("✅ Підтвердити");
         row1.add("❌ Відхилити");
         row1.add("🗑️ Видалити замовлення");
         keyboard.add(row1);
 
-        // Ряд з кнопкою назад
         KeyboardRow row2 = new KeyboardRow();
-        row2.add("⬅️ Назад");
+        row2.add("⏮️ Назад");
+        row2.add("⏭️ Дальше");
         keyboard.add(row2);
+
+        KeyboardRow row3 = new KeyboardRow();
+        row3.add("⬅️ Назад (Продавець меню)");
+        keyboard.add(row3);
 
         keyboardMarkup.setKeyboard(keyboard);
 
