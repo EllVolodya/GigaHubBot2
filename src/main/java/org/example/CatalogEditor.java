@@ -200,7 +200,6 @@ public class CatalogEditor {
         }
     }
 
-    // --- Отримати ціну продукту з YAML
     public static double getProductPriceFromYAML(String productName) {
         try (InputStream inputStream = CatalogEditor.class.getClassLoader().getResourceAsStream("catalog.yml")) {
             if (inputStream == null) {
@@ -209,7 +208,23 @@ public class CatalogEditor {
             }
 
             Yaml yaml = new Yaml();
-            List<Map<String, Object>> products = yaml.load(inputStream);
+            Object data = yaml.load(inputStream);
+
+            List<Map<String, Object>> products;
+
+            if (data instanceof List) {
+                products = (List<Map<String, Object>>) data;
+            } else if (data instanceof Map) {
+                Map<String, Object> map = (Map<String, Object>) data;
+                products = (List<Map<String, Object>>) map.get("products");
+                if (products == null) {
+                    System.out.println("DEBUG: 'products' key not found in catalog.yml");
+                    return 0.0;
+                }
+            } else {
+                System.out.println("DEBUG: catalog.yml root element is neither a list nor a map");
+                return 0.0;
+            }
 
             for (Map<String, Object> product : products) {
                 Object nameObj = product.get("name");
@@ -218,7 +233,6 @@ public class CatalogEditor {
                 String name = nameObj.toString().trim();
                 System.out.println("DEBUG: Checking YAML product name: '" + name + "' against '" + productName + "'");
 
-                // Використовуємо equalsIgnoreCase та contains для гнучкого пошуку
                 if (name.equalsIgnoreCase(productName.trim()) || name.contains(productName.trim())) {
                     Object priceObj = product.get("price");
                     if (priceObj != null) {
@@ -240,7 +254,7 @@ public class CatalogEditor {
         }
 
         System.out.println("DEBUG: Product '" + productName + "' not found in YAML");
-        return 0.0; // дефолтна ціна, якщо продукт не знайдено
+        return 0.0;
     }
 
     // --- Перевірка існування підкатегорії
