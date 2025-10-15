@@ -14,6 +14,8 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.io.InputStream;
 import java.io.FileOutputStream;
@@ -2585,70 +2587,70 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
     // 🔹 Генерує повідомлення з замовленням і кнопками управління
-    private SendMessage createOrderAdminMenu(String chatId, Map<String, Object> order, Long userId) {
+    private void createOrderAdminMenu(String chatId, Map<String, Object> order, Long userId) {
         StringBuilder sb = new StringBuilder();
+
         sb.append("🆔 User ID: ").append(userId).append("\n")
                 .append("🔢 Код замовлення: ").append(order.get("orderCode")).append("\n")
-                .append("📦 Тип замовлення: ").append(order.getOrDefault("deliveryType", "Доставка")).append("\n\n");
+                .append("📦 Тип замовлення: ").append(order.getOrDefault("deliveryType", "Невідомо")).append("\n\n");
 
-        String deliveryType = order.getOrDefault("deliveryType", "Доставка").toString();
+        sb.append("🏙 Місто: ").append(order.getOrDefault("city", "-")).append("\n")
+                .append("👤 П.І.: ").append(order.getOrDefault("fullName", "-")).append("\n")
+                .append("📞 Телефон: ").append(order.getOrDefault("phone", "-")).append("\n")
+                .append("💳 Картка: ").append(order.getOrDefault("card", "-")).append("\n\n");
 
-        switch (deliveryType) {
-            case "Самовивіз" -> sb.append("🏙 Місто: ").append(order.getOrDefault("city", "Невідомо")).append("\n")
-                    .append("👤 П.І.: ").append(order.getOrDefault("fullName", "Невідомо")).append("\n")
-                    .append("📞 Телефон: ").append(order.getOrDefault("phone", "Невідомо")).append("\n")
-                    .append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
-            case "Доставка по місту" -> sb.append("🏠 Адреса: ").append(order.getOrDefault("address", "Невідомо")).append("\n")
-                    .append("👤 П.І.: ").append(order.getOrDefault("fullName", "Невідомо")).append("\n")
-                    .append("📞 Телефон: ").append(order.getOrDefault("phone", "Невідомо")).append("\n")
-                    .append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
-            case "Нова пошта" -> sb.append("📮 Відділення НП: ").append(order.getOrDefault("postOffice", "Невідомо")).append("\n")
-                    .append("👤 П.І.: ").append(order.getOrDefault("fullName", "Невідомо")).append("\n")
-                    .append("📞 Телефон: ").append(order.getOrDefault("phone", "Невідомо")).append("\n")
-                    .append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
-            default -> sb.append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
-        }
-
-        // Список товарів з TEXT
-        String itemsStr = (String) order.get("item"); // беремо рядок із БД
-        double total = 0;
+        // 🔹 Вивід товарів
+        String itemsStr = (String) order.get("item");
         int i = 1;
-
         if (itemsStr != null && !itemsStr.isEmpty()) {
             String[] itemArr = itemsStr.split(";");
             for (String s : itemArr) {
                 if (s.isEmpty()) continue;
                 String[] pair = s.split(":");
                 String name = pair[0];
-                double price = Double.parseDouble(pair[1]);
+                double price = 0;
+                try {
+                    if (pair.length > 1) price = Double.parseDouble(pair[1]);
+                } catch (Exception ignored) {}
                 sb.append(i++).append(". 🛒 ").append(name)
                         .append(" — ").append(price).append(" грн\n");
-                total += price;
             }
         }
+
+        // 🔹 Загальна сума
+        double total = 0.0;
+        Object totalObj = order.get("total");
+        if (totalObj instanceof Number) total = ((Number) totalObj).doubleValue();
+        else if (totalObj != null) {
+            try { total = Double.parseDouble(totalObj.toString()); } catch (Exception ignored) {}
+        }
+
         sb.append("\n💰 Всього: ").append(total).append(" грн");
 
-        // Кнопки управління замовленням
-        ReplyKeyboardMarkup kb = new ReplyKeyboardMarkup();
-        kb.setResizeKeyboard(true);
-        List<KeyboardRow> rows = new ArrayList<>();
+        // 🔹 Кнопки
+        InlineKeyboardButton confirmButton = new InlineKeyboardButton("✅ Підтвердити");
+        confirmButton.setCallbackData("admin_confirm:" + order.get("orderCode"));
 
-        KeyboardRow r1 = new KeyboardRow();
-        r1.add("✅ Підтвердити замовлення");
-        r1.add("❌ Відхилити замовлення");
-        r1.add("🗑️ Видалити замовлення");
+        InlineKeyboardButton cancelButton = new InlineKeyboardButton("❌ Відхилити");
+        cancelButton.setCallbackData("admin_cancel:" + order.get("orderCode"));
 
-        KeyboardRow r2 = new KeyboardRow();
-        r2.add("➡️ Далі");
-        r2.add("⬅️ Назад в адмін-меню");
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+        keyboard.add(Arrays.asList(confirmButton, cancelButton));
 
-        rows.add(r1);
-        rows.add(r2);
-        kb.setKeyboard(rows);
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        markup.setKeyboard(keyboard);
 
-        SendMessage msg = new SendMessage(chatId, sb.toString());
-        msg.setReplyMarkup(kb);
-        return msg;
+        // 🔹 Повідомлення
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+        message.setText(sb.toString());
+        message.setReplyMarkup(markup);
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
     }
 
     // Допоміжний метод для створення клавіатури відгуку
@@ -2717,31 +2719,23 @@ public class StoreBot extends TelegramLongPollingBot {
                 order.put("phone", rs.getString("phone"));
                 order.put("card", rs.getString("card"));
                 order.put("status", rs.getString("status"));
-                order.put("total", rs.getDouble("total"));
                 order.put("date", rs.getDate("date"));
+                order.put("item", rs.getString("item"));
 
-                // --- Розбираємо items з рядка у List<Map<String, Object>> ---
-                List<Map<String, Object>> items = new ArrayList<>();
-                String itemsStr = rs.getString("item"); // читаємо колонку item
-                if (itemsStr != null && !itemsStr.isEmpty()) {
-                    String[] parts = itemsStr.split(";");
-                    for (String part : parts) {
-                        if (part.isEmpty()) continue;
-                        String[] pair = part.split(":");
-                        Map<String, Object> item = new HashMap<>();
-                        item.put("name", pair[0].trim());
-                        try {
-                            item.put("price", Double.parseDouble(pair[1].trim()));
-                        } catch (Exception ex) {
-                            item.put("price", 0.0);
-                        }
-                        items.add(item);
-                    }
+                // 🔹 Отримуємо total типобезпечно
+                Object totalObj = rs.getObject("total");
+                double total = 0.0;
+                if (totalObj instanceof Number) {
+                    total = ((Number) totalObj).doubleValue();
+                } else if (totalObj != null) {
+                    try {
+                        total = Double.parseDouble(totalObj.toString());
+                    } catch (Exception ignored) {}
                 }
-                order.put("items", items);
+                order.put("total", total);
 
-                // Відправляємо адміну
-                sendMessage(createOrderAdminMenu(chatId, order, rs.getLong("userId")));
+                // 🔹 Відправляємо адміну оформлене повідомлення
+                createOrderAdminMenu(chatId, order, rs.getLong("userId"));
             }
 
         } catch (SQLException e) {
