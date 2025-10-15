@@ -2553,7 +2553,7 @@ public class StoreBot extends TelegramLongPollingBot {
         }
 
         // Список товарів
-        List<Map<String, Object>> items = (List<Map<String, Object>>) order.get("items");
+        List<Map<String, Object>> items = (List<Map<String, Object>>) order.get("item");
         if (items != null) {
             double total = 0;
             int i = 1;
