@@ -25,7 +25,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
-import java.time.LocalDate;
 
 public class StoreBot extends TelegramLongPollingBot {
 
@@ -1137,7 +1136,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
             }
 
-            case "order_pickup", "awaiting_city_delivery", "awaiting_post_delivery" -> {
+            case "order_pickup" -> {
                 List<Map<String, Object>> cart = userCart.get(userId);
                 if (cart == null || cart.isEmpty()) {
                     sendText(chatId, "🛒 Ваш кошик порожній.");
@@ -1146,109 +1145,216 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 String orderCode = String.format("%04d", new Random().nextInt(10000));
+                String[] parts = text.split(",", 4); // Місто, П.І., Телефон, Картка
+                String city = parts.length > 0 ? parts[0].trim() : "Невідомо";
+                String fullName = parts.length > 1 ? parts[1].trim() : "Невідомо";
+                String phone = parts.length > 2 ? parts[2].trim() : "Невідомо";
+                String card = parts.length > 3 ? parts[3].trim() : "Немає";
 
-                String city = null;
-                String address = null;
-                String postOffice = null;
-                String fullName = "Невідомо";
-                String phone = "Невідомо";
-                String card = "Немає";
-
-                String[] parts = text.split(",", 4);
-                switch (userStates.get(userId)) {
-                    case "order_pickup" -> {
-                        city = parts.length > 0 ? parts[0].trim() : "Невідомо";
-                        fullName = parts.length > 1 ? parts[1].trim() : fullName;
-                        phone = parts.length > 2 ? parts[2].trim() : phone;
-                        card = parts.length > 3 ? parts[3].trim() : card;
-                    }
-                    case "awaiting_city_delivery" -> {
-                        address = parts.length > 0 ? parts[0].trim() : "Невідомо";
-                        fullName = parts.length > 1 ? parts[1].trim() : fullName;
-                        phone = parts.length > 2 ? parts[2].trim() : phone;
-                        card = parts.length > 3 ? parts[3].trim() : card;
-                    }
-                    case "awaiting_post_delivery" -> {
-                        postOffice = parts.length > 0 ? parts[0].trim() : "Невідомо";
-                        fullName = parts.length > 1 ? parts[1].trim() : fullName;
-                        phone = parts.length > 2 ? parts[2].trim() : phone;
-                        card = parts.length > 3 ? parts[3].trim() : card;
-                    }
-                }
-
-                // Генеруємо рядок item та підраховуємо total
+                // Генеруємо рядок items для БД та total
                 StringBuilder itemsDb = new StringBuilder();
                 double total = 0;
-                int i = 1;
                 for (Map<String, Object> item : cart) {
-                    String name = item.getOrDefault("name", item.getOrDefault("title", "Без назви")).toString();
+                    String name = item.getOrDefault("name", "Без назви").toString();
                     double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
                     itemsDb.append(name).append(":").append(price).append(";");
                     total += price;
                 }
 
-                // Формуємо дані замовлення
-                Map<String, Object> orderData = new HashMap<>();
-                orderData.put("orderCode", orderCode);
-                orderData.put("userId", userId);
-                orderData.put("deliveryType", switch(userStates.get(userId)) {
-                    case "order_pickup" -> "Самовивіз";
-                    case "awaiting_city_delivery" -> "Доставка по місту";
-                    default -> "Нова пошта";
-                });
-                orderData.put("city", city);
-                orderData.put("address", address);
-                orderData.put("postOffice", postOffice);
-                orderData.put("fullName", fullName);
-                orderData.put("phone", phone);
-                orderData.put("card", card);
-                orderData.put("status", "Нове");
-                orderData.put("item", itemsDb.toString());
-                orderData.put("total", total);
-                orderData.put("date", LocalDate.now().toString());
-
                 // Збереження в базу
-                OrderFileManager.addOrder(orderData);
+                try (Connection conn = DatabaseManager.getConnection()) {
+                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, city, fullName, phone, card, status, item, total, date) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setString(1, orderCode);
+                        stmt.setLong(2, userId);
+                        stmt.setString(3, "Самовивіз");
+                        stmt.setString(4, city);
+                        stmt.setString(5, fullName);
+                        stmt.setString(6, phone);
+                        stmt.setString(7, card);
+                        stmt.setString(8, "Нове");
+                        stmt.setString(9, itemsDb.toString());
+                        stmt.setDouble(10, total);
+                        stmt.executeUpdate();
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "❌ Сталася помилка при збереженні замовлення.");
+                    return;
+                }
 
                 // Повідомлення адміну
                 for (Long adminId : ADMINS) {
                     StringBuilder sb = new StringBuilder();
                     sb.append("🆔 User ID: ").append(userId).append("\n")
                             .append("🔢 Код замовлення: ").append(orderCode).append("\n")
-                            .append("📦 Тип замовлення: ").append(orderData.get("deliveryType")).append("\n\n");
-
-                    switch (orderData.get("deliveryType").toString()) {
-                        case "Самовивіз" -> sb.append("🏙 Місто: ").append(city).append("\n");
-                        case "Доставка по місту" -> sb.append("🏠 Адреса: ").append(address).append("\n");
-                        case "Нова пошта" -> sb.append("📮 Відділення НП: ").append(postOffice).append("\n");
-                    }
-
-                    sb.append("👤 П.І.: ").append(fullName).append("\n")
+                            .append("📦 Тип замовлення: Самовивіз\n\n")
+                            .append("🏙 Місто: ").append(city).append("\n")
+                            .append("👤 П.І.: ").append(fullName).append("\n")
                             .append("📞 Телефон: ").append(phone).append("\n")
                             .append("💳 Картка: ").append(card).append("\n\n");
 
-                    i = 1;
+                    int i = 1;
                     for (Map<String, Object> item : cart) {
-                        String name = item.getOrDefault("name", item.getOrDefault("title", "Без назви")).toString();
+                        String name = item.getOrDefault("name", "Без назви").toString();
                         double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
                         sb.append(i++).append(". 🛒 ").append(name).append(" — ").append(price).append(" грн\n");
                     }
                     sb.append("\n💰 Всього: ").append(total).append(" грн");
+                    sendText(adminId.toString(), sb.toString());
+                }
 
+                userCart.remove(userId);
+                userStates.remove(userId);
+                sendText(chatId, "✅ Ваше замовлення успішно оформлено!\nКод замовлення: " + orderCode +
+                        "\nБудь ласка, заберіть товар у магазині.");
+            }
+
+            case "awaiting_city_delivery" -> {
+                List<Map<String, Object>> cart = userCart.get(userId);
+                if (cart == null || cart.isEmpty()) {
+                    sendText(chatId, "🛒 Ваш кошик порожній.");
+                    userStates.remove(userId);
+                    return;
+                }
+
+                String orderCode = String.format("%04d", new Random().nextInt(10000));
+                String[] parts = text.split(",", 4); // Адреса, П.І., Телефон, Картка
+                String address = parts.length > 0 ? parts[0].trim() : "Невідомо";
+                String fullName = parts.length > 1 ? parts[1].trim() : "Невідомо";
+                String phone = parts.length > 2 ? parts[2].trim() : "Невідомо";
+                String card = parts.length > 3 ? parts[3].trim() : "Немає";
+
+                StringBuilder itemsDb = new StringBuilder();
+                double total = 0;
+                for (Map<String, Object> item : cart) {
+                    String name = item.getOrDefault("name", "Без назви").toString();
+                    double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
+                    itemsDb.append(name).append(":").append(price).append(";");
+                    total += price;
+                }
+
+                try (Connection conn = DatabaseManager.getConnection()) {
+                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, address, fullName, phone, card, status, item, total, date) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setString(1, orderCode);
+                        stmt.setLong(2, userId);
+                        stmt.setString(3, "Доставка по місту");
+                        stmt.setString(4, address);
+                        stmt.setString(5, fullName);
+                        stmt.setString(6, phone);
+                        stmt.setString(7, card);
+                        stmt.setString(8, "Нове");
+                        stmt.setString(9, itemsDb.toString());
+                        stmt.setDouble(10, total);
+                        stmt.executeUpdate();
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "❌ Сталася помилка при збереженні замовлення.");
+                    return;
+                }
+
+                for (Long adminId : ADMINS) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("🆔 User ID: ").append(userId).append("\n")
+                            .append("🔢 Код замовлення: ").append(orderCode).append("\n")
+                            .append("📦 Тип замовлення: Доставка по місту\n\n")
+                            .append("🏠 Адреса: ").append(address).append("\n")
+                            .append("👤 П.І.: ").append(fullName).append("\n")
+                            .append("📞 Телефон: ").append(phone).append("\n")
+                            .append("💳 Картка: ").append(card).append("\n\n");
+
+                    int i = 1;
+                    for (Map<String, Object> item : cart) {
+                        String name = item.getOrDefault("name", "Без назви").toString();
+                        double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
+                        sb.append(i++).append(". 🛒 ").append(name).append(" — ").append(price).append(" грн\n");
+                    }
+                    sb.append("\n💰 Всього: ").append(total).append(" грн");
                     sendText(adminId.toString(), sb.toString());
                 }
 
                 userCart.remove(userId);
                 userStates.remove(userId);
                 tempStorage.remove(userId + "_deliveryType");
+                sendText(chatId, "✅ Ваше замовлення успішно оформлено!\nКод замовлення: " + orderCode +
+                        "\nВаш товар буде доставлений за вказаною адресою.");
+            }
 
-                String deliveryMessage = switch(orderData.get("deliveryType").toString()) {
-                    case "Самовивіз" -> "Будь ласка, заберіть товар у магазині.";
-                    case "Доставка по місту" -> "Ваш товар буде доставлений за вказаною адресою.";
-                    default -> "Ваш товар буде доставлений Новою поштою за вказаним відділенням.";
-                };
+            case "awaiting_post_delivery" -> {
+                List<Map<String, Object>> cart = userCart.get(userId);
+                if (cart == null || cart.isEmpty()) {
+                    sendText(chatId, "🛒 Ваш кошик порожній.");
+                    userStates.remove(userId);
+                    return;
+                }
 
-                sendText(chatId, "✅ Ваше замовлення успішно оформлено!\nКод замовлення: " + orderCode + "\n" + deliveryMessage);
+                String orderCode = String.format("%04d", new Random().nextInt(10000));
+                String[] parts = text.split(",", 4); // Відділення НП, П.І., Телефон, Картка
+                String postOffice = parts.length > 0 ? parts[0].trim() : "Невідомо";
+                String fullName = parts.length > 1 ? parts[1].trim() : "Невідомо";
+                String phone = parts.length > 2 ? parts[2].trim() : "Невідомо";
+                String card = parts.length > 3 ? parts[3].trim() : "Немає";
+
+                StringBuilder itemsDb = new StringBuilder();
+                double total = 0;
+                for (Map<String, Object> item : cart) {
+                    String name = item.getOrDefault("name", "Без назви").toString();
+                    double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
+                    itemsDb.append(name).append(":").append(price).append(";");
+                    total += price;
+                }
+
+                try (Connection conn = DatabaseManager.getConnection()) {
+                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, postOffice, fullName, phone, card, status, item, total, date) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setString(1, orderCode);
+                        stmt.setLong(2, userId);
+                        stmt.setString(3, "Нова пошта");
+                        stmt.setString(4, postOffice);
+                        stmt.setString(5, fullName);
+                        stmt.setString(6, phone);
+                        stmt.setString(7, card);
+                        stmt.setString(8, "Нове");
+                        stmt.setString(9, itemsDb.toString());
+                        stmt.setDouble(10, total);
+                        stmt.executeUpdate();
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "❌ Сталася помилка при збереженні замовлення.");
+                    return;
+                }
+
+                for (Long adminId : ADMINS) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("🆔 User ID: ").append(userId).append("\n")
+                            .append("🔢 Код замовлення: ").append(orderCode).append("\n")
+                            .append("📦 Тип замовлення: Нова пошта\n\n")
+                            .append("📮 Відділення НП: ").append(postOffice).append("\n")
+                            .append("👤 П.І.: ").append(fullName).append("\n")
+                            .append("📞 Телефон: ").append(phone).append("\n")
+                            .append("💳 Картка: ").append(card).append("\n\n");
+
+                    int i = 1;
+                    for (Map<String, Object> item : cart) {
+                        String name = item.getOrDefault("name", "Без назви").toString();
+                        double price = Double.parseDouble(item.getOrDefault("price", "0").toString());
+                        sb.append(i++).append(". 🛒 ").append(name).append(" — ").append(price).append(" грн\n");
+                    }
+                    sb.append("\n💰 Всього: ").append(total).append(" грн");
+                    sendText(adminId.toString(), sb.toString());
+                }
+
+                userCart.remove(userId);
+                userStates.remove(userId);
+                tempStorage.remove(userId + "_deliveryType");
+                sendText(chatId, "✅ Ваше замовлення успішно оформлено!\nКод замовлення: " + orderCode +
+                        "\nВаш товар буде доставлений Новою поштою за вказаним відділенням.");
             }
 
             case "invites_menu" -> {
@@ -2415,6 +2521,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 .append("📦 Тип замовлення: ").append(order.getOrDefault("deliveryType", "Доставка")).append("\n\n");
 
         String deliveryType = order.getOrDefault("deliveryType", "Доставка").toString();
+
         switch (deliveryType) {
             case "Самовивіз" -> sb.append("🏙 Місто: ").append(order.getOrDefault("city", "Невідомо")).append("\n")
                     .append("👤 П.І.: ").append(order.getOrDefault("fullName", "Невідомо")).append("\n")
@@ -2431,22 +2538,24 @@ public class StoreBot extends TelegramLongPollingBot {
             default -> sb.append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
         }
 
-        // Відображаємо список товарів із TEXT колонки item
-        String itemsStr = (String) order.get("item");
+        // Список товарів з TEXT
+        String itemsStr = (String) order.get("item"); // беремо рядок із БД
+        double total = 0;
+        int i = 1;
+
         if (itemsStr != null && !itemsStr.isEmpty()) {
             String[] itemArr = itemsStr.split(";");
-            int i = 1;
             for (String s : itemArr) {
                 if (s.isEmpty()) continue;
                 String[] pair = s.split(":");
                 String name = pair[0];
-                String price = pair[1];
-                sb.append(i++).append(". 🛒 ").append(name).append(" — ").append(price).append(" грн\n");
+                double price = Double.parseDouble(pair[1]);
+                sb.append(i++).append(". 🛒 ").append(name)
+                        .append(" — ").append(price).append(" грн\n");
+                total += price;
             }
         }
-
-        // Використовуємо total прямо з БД
-        sb.append("\n💰 Всього: ").append(order.getOrDefault("total", 0.0)).append(" грн");
+        sb.append("\n💰 Всього: ").append(total).append(" грн");
 
         // Кнопки управління замовленням
         ReplyKeyboardMarkup kb = new ReplyKeyboardMarkup();
