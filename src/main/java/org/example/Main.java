@@ -11,11 +11,16 @@ public class Main {
     private static final Logger logger = Logger.getLogger(Main.class.getName());
 
     public static void main(String[] args) {
+        // Підключаємо базу даних
+        DatabaseManager.connect();
+
         try {
             String token = System.getenv("BOT_TOKEN");
             if (token == null || token.isBlank()) {
                 logger.severe("BOT_TOKEN environment variable is not set. Exiting.");
                 System.err.println("ERROR: BOT_TOKEN environment variable is not set.");
+                // Закриваємо підключення перед виходом
+                DatabaseManager.disconnect();
                 System.exit(1);
             }
 
@@ -26,6 +31,9 @@ public class Main {
             logger.info("Bot started successfully!");
         } catch (TelegramApiException e) {
             logger.log(Level.SEVERE, "Failed to start bot", e);
+        } finally {
+            // Закриваємо підключення при завершенні програми
+            Runtime.getRuntime().addShutdownHook(new Thread(DatabaseManager::disconnect));
         }
     }
 }
