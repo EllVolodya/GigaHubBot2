@@ -1132,54 +1132,59 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 String orderCode = String.format("%04d", new Random().nextInt(10000));
-                Map<String, Object> orderData = new HashMap<>();
-                orderData.put("orderCode", orderCode);
-                orderData.put("userId", userId);
-                orderData.put("deliveryType", "Самовивіз");
-                orderData.put("items", new ArrayList<>(cart));
-                orderData.put("total", cart.stream()
+                String[] parts = text.split(",", 4); // Місто, П.І., Телефон, Картка
+                String city = parts.length > 0 ? parts[0].trim() : "Невідомо";
+                String fullName = parts.length > 1 ? parts[1].trim() : "Невідомо";
+                String phone = parts.length > 2 ? parts[2].trim() : "Невідомо";
+                String card = parts.length > 3 ? parts[3].trim() : "Немає";
+                double total = cart.stream()
                         .mapToDouble(i -> Double.parseDouble(i.getOrDefault("price", "0").toString()))
-                        .sum());
-                orderData.put("status", "Нове");
-                orderData.put("date", LocalDateTime.now().toString());
+                        .sum();
 
-                // --- Розбираємо дані користувача ---
-                String[] parts = text.split(",", 4); // формат: Місто, П.І., Телефон, Картка
-                orderData.put("city", parts.length > 0 ? parts[0].trim() : "Невідомо");
-                orderData.put("fullName", parts.length > 1 ? parts[1].trim() : "Невідомо");
-                orderData.put("phone", parts.length > 2 ? parts[2].trim() : "Невідомо");
-                orderData.put("card", parts.length > 3 ? parts[3].trim() : "Немає");
+                try (Connection conn = DatabaseManager.getConnection()) {
+                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, city, fullName, phone, card, status, total, date) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setString(1, orderCode);
+                        stmt.setLong(2, userId);
+                        stmt.setString(3, "Самовивіз");
+                        stmt.setString(4, city);
+                        stmt.setString(5, fullName);
+                        stmt.setString(6, phone);
+                        stmt.setString(7, card);
+                        stmt.setString(8, "Нове");
+                        stmt.setDouble(9, total);
+                        stmt.executeUpdate();
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "❌ Сталася помилка при збереженні замовлення.");
+                    return;
+                }
 
-                // --- Зберігаємо замовлення ---
-                userOrders.computeIfAbsent(userId, k -> new ArrayList<>()).add(orderData);
-                OrderFileManager.addOrder(orderData);
-
-                // --- Відправка повідомлення адміністратору ---
+                // Повідомлення адміну
                 for (Long adminId : ADMINS) {
                     StringBuilder sb = new StringBuilder();
                     sb.append("🆔 User ID: ").append(userId).append("\n")
                             .append("🔢 Код замовлення: ").append(orderCode).append("\n")
-                            .append("📦 Тип замовлення: ").append("Самовивіз").append("\n\n")
-                            .append("🏙 Місто: ").append(orderData.get("city")).append("\n")
-                            .append("👤 П.І.: ").append(orderData.get("fullName")).append("\n")
-                            .append("📞 Телефон: ").append(orderData.get("phone")).append("\n")
-                            .append("💳 Карта: ").append(orderData.get("card")).append("\n\n");
+                            .append("📦 Тип замовлення: Самовивіз\n\n")
+                            .append("🏙 Місто: ").append(city).append("\n")
+                            .append("👤 П.І.: ").append(fullName).append("\n")
+                            .append("📞 Телефон: ").append(phone).append("\n")
+                            .append("💳 Карта: ").append(card).append("\n\n");
 
                     int i = 1;
                     for (Map<String, Object> item : cart) {
                         sb.append(i++).append(". 🛒 ").append(item.getOrDefault("name", "Без назви"))
                                 .append(" — ").append(item.getOrDefault("price", "0")).append(" грн\n");
                     }
-                    sb.append("\n💰 Всього: ").append(orderData.get("total")).append(" грн");
+                    sb.append("\n💰 Всього: ").append(total).append(" грн");
 
                     sendText(adminId.toString(), sb.toString());
                 }
 
-                // --- Очищення ---
                 userCart.remove(userId);
                 userStates.remove(userId);
-
-                // --- Повідомлення користувачу ---
                 sendText(chatId, "✅ Ваше замовлення успішно оформлено!\nКод замовлення: " + orderCode +
                         "\nБудь ласка, заберіть товар у магазині.");
             }
@@ -1193,55 +1198,59 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 String orderCode = String.format("%04d", new Random().nextInt(10000));
-                Map<String, Object> orderData = new HashMap<>();
-                orderData.put("orderCode", orderCode);
-                orderData.put("userId", userId);
-                orderData.put("deliveryType", "Доставка по місту");
-                orderData.put("items", new ArrayList<>(cart));
-                orderData.put("total", cart.stream()
+                String[] parts = text.split(",", 4); // Адреса, П.І., Телефон, Картка
+                String address = parts.length > 0 ? parts[0].trim() : "Невідомо";
+                String fullName = parts.length > 1 ? parts[1].trim() : "Невідомо";
+                String phone = parts.length > 2 ? parts[2].trim() : "Невідомо";
+                String card = parts.length > 3 ? parts[3].trim() : "Немає";
+                double total = cart.stream()
                         .mapToDouble(i -> Double.parseDouble(i.getOrDefault("price", "0").toString()))
-                        .sum());
-                orderData.put("status", "Нове");
-                orderData.put("date", LocalDateTime.now().toString());
+                        .sum();
 
-                // --- Розбираємо дані користувача: Адреса, П.І., Телефон, Картка ---
-                String[] parts = text.split(",", 4);
-                orderData.put("address", parts.length > 0 ? parts[0].trim() : "Невідомо");
-                orderData.put("fullName", parts.length > 1 ? parts[1].trim() : "Невідомо");
-                orderData.put("phone", parts.length > 2 ? parts[2].trim() : "Невідомо");
-                orderData.put("card", parts.length > 3 ? parts[3].trim() : "Немає");
+                try (Connection conn = DatabaseManager.getConnection()) {
+                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, address, fullName, phone, card, status, total, date) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setString(1, orderCode);
+                        stmt.setLong(2, userId);
+                        stmt.setString(3, "Доставка по місту");
+                        stmt.setString(4, address);
+                        stmt.setString(5, fullName);
+                        stmt.setString(6, phone);
+                        stmt.setString(7, card);
+                        stmt.setString(8, "Нове");
+                        stmt.setDouble(9, total);
+                        stmt.executeUpdate();
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "❌ Сталася помилка при збереженні замовлення.");
+                    return;
+                }
 
-                // --- Зберігаємо замовлення ---
-                userOrders.computeIfAbsent(userId, k -> new ArrayList<>()).add(orderData);
-                OrderFileManager.addOrder(orderData);
-
-                // --- Відправка адміну ---
                 for (Long adminId : ADMINS) {
                     StringBuilder sb = new StringBuilder();
                     sb.append("🆔 User ID: ").append(userId).append("\n")
                             .append("🔢 Код замовлення: ").append(orderCode).append("\n")
-                            .append("📦 Тип замовлення: ").append("Доставка по місту").append("\n\n")
-                            .append("🏠 Адреса: ").append(orderData.get("address")).append("\n")
-                            .append("👤 П.І.: ").append(orderData.get("fullName")).append("\n")
-                            .append("📞 Телефон: ").append(orderData.get("phone")).append("\n")
-                            .append("💳 Карта: ").append(orderData.get("card")).append("\n\n");
+                            .append("📦 Тип замовлення: Доставка по місту\n\n")
+                            .append("🏠 Адреса: ").append(address).append("\n")
+                            .append("👤 П.І.: ").append(fullName).append("\n")
+                            .append("📞 Телефон: ").append(phone).append("\n")
+                            .append("💳 Карта: ").append(card).append("\n\n");
 
                     int i = 1;
                     for (Map<String, Object> item : cart) {
                         sb.append(i++).append(". 🛒 ").append(item.getOrDefault("name", "Без назви"))
                                 .append(" — ").append(item.getOrDefault("price", "0")).append(" грн\n");
                     }
-                    sb.append("\n💰 Всього: ").append(orderData.get("total")).append(" грн");
+                    sb.append("\n💰 Всього: ").append(total).append(" грн");
 
                     sendText(adminId.toString(), sb.toString());
                 }
 
-                // --- Очищення ---
                 userCart.remove(userId);
                 userStates.remove(userId);
                 tempStorage.remove(userId + "_deliveryType");
-
-                // --- Повідомлення користувачу ---
                 sendText(chatId, "✅ Ваше замовлення успішно оформлено!\nКод замовлення: " + orderCode +
                         "\nВаш товар буде доставлений за вказаною адресою.");
             }
@@ -1255,55 +1264,59 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 String orderCode = String.format("%04d", new Random().nextInt(10000));
-                Map<String, Object> orderData = new HashMap<>();
-                orderData.put("orderCode", orderCode);
-                orderData.put("userId", userId);
-                orderData.put("deliveryType", "Нова пошта");
-                orderData.put("items", new ArrayList<>(cart));
-                orderData.put("total", cart.stream()
+                String[] parts = text.split(",", 4); // Відділення НП, П.І., Телефон, Картка
+                String postOffice = parts.length > 0 ? parts[0].trim() : "Невідомо";
+                String fullName = parts.length > 1 ? parts[1].trim() : "Невідомо";
+                String phone = parts.length > 2 ? parts[2].trim() : "Невідомо";
+                String card = parts.length > 3 ? parts[3].trim() : "Немає";
+                double total = cart.stream()
                         .mapToDouble(i -> Double.parseDouble(i.getOrDefault("price", "0").toString()))
-                        .sum());
-                orderData.put("status", "Нове");
-                orderData.put("date", LocalDateTime.now().toString());
+                        .sum();
 
-                // --- Розбираємо дані користувача: Відділення НП, П.І., Телефон, Картка ---
-                String[] parts = text.split(",", 4);
-                orderData.put("postOffice", parts.length > 0 ? parts[0].trim() : "Невідомо");
-                orderData.put("fullName", parts.length > 1 ? parts[1].trim() : "Невідомо");
-                orderData.put("phone", parts.length > 2 ? parts[2].trim() : "Невідомо");
-                orderData.put("card", parts.length > 3 ? parts[3].trim() : "Немає");
+                try (Connection conn = DatabaseManager.getConnection()) {
+                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, postOffice, fullName, phone, card, status, total, date) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setString(1, orderCode);
+                        stmt.setLong(2, userId);
+                        stmt.setString(3, "Нова пошта");
+                        stmt.setString(4, postOffice);
+                        stmt.setString(5, fullName);
+                        stmt.setString(6, phone);
+                        stmt.setString(7, card);
+                        stmt.setString(8, "Нове");
+                        stmt.setDouble(9, total);
+                        stmt.executeUpdate();
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "❌ Сталася помилка при збереженні замовлення.");
+                    return;
+                }
 
-                // --- Зберігаємо замовлення ---
-                userOrders.computeIfAbsent(userId, k -> new ArrayList<>()).add(orderData);
-                OrderFileManager.addOrder(orderData);
-
-                // --- Відправка адміну ---
                 for (Long adminId : ADMINS) {
                     StringBuilder sb = new StringBuilder();
                     sb.append("🆔 User ID: ").append(userId).append("\n")
                             .append("🔢 Код замовлення: ").append(orderCode).append("\n")
-                            .append("📦 Тип замовлення: ").append("Нова пошта").append("\n\n")
-                            .append("📮 Відділення НП: ").append(orderData.get("postOffice")).append("\n")
-                            .append("👤 П.І.: ").append(orderData.get("fullName")).append("\n")
-                            .append("📞 Телефон: ").append(orderData.get("phone")).append("\n")
-                            .append("💳 Карта: ").append(orderData.get("card")).append("\n\n");
+                            .append("📦 Тип замовлення: Нова пошта\n\n")
+                            .append("📮 Відділення НП: ").append(postOffice).append("\n")
+                            .append("👤 П.І.: ").append(fullName).append("\n")
+                            .append("📞 Телефон: ").append(phone).append("\n")
+                            .append("💳 Карта: ").append(card).append("\n\n");
 
                     int i = 1;
                     for (Map<String, Object> item : cart) {
                         sb.append(i++).append(". 🛒 ").append(item.getOrDefault("name", "Без назви"))
                                 .append(" — ").append(item.getOrDefault("price", "0")).append(" грн\n");
                     }
-                    sb.append("\n💰 Всього: ").append(orderData.get("total")).append(" грн");
+                    sb.append("\n💰 Всього: ").append(total).append(" грн");
 
                     sendText(adminId.toString(), sb.toString());
                 }
 
-                // --- Очищення ---
                 userCart.remove(userId);
                 userStates.remove(userId);
                 tempStorage.remove(userId + "_deliveryType");
-
-                // --- Повідомлення користувачу ---
                 sendText(chatId, "✅ Ваше замовлення успішно оформлено!\nКод замовлення: " + orderCode +
                         "\nВаш товар буде доставлений Новою поштою за вказаним відділенням.");
             }
