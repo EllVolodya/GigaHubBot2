@@ -592,8 +592,19 @@ public class StoreBot extends TelegramLongPollingBot {
                     if (idx > 0) adminOrderIndex.put(userId, idx - 1); // повертаємося назад
                     showAdminOrder(userId, chatId);
                 }
+
                 case "⬅️ Назад (Продавець)" -> {
-                    sendMessage(createAdminMenu(chatId)); // показуємо меню продавця
+                    // Очищаємо індекс перегляду замовлень
+                    adminOrderIndex.remove(userId);
+
+                    // Відправляємо меню продавця
+                    SendMessage menuMsg = createAdminMenu(chatId);
+                    try {
+                        execute(menuMsg); // <-- відправка повідомлення через execute
+                    } catch (TelegramApiException e) {
+                        e.printStackTrace();
+                        sendText(chatId, "❌ Помилка при відправці меню продавця.");
+                    }
                 }
 
                 case "➡️ Далі" -> {
