@@ -201,7 +201,15 @@ public class CatalogEditor {
                 String name = (String) product.get("name");
                 if (name != null && name.equalsIgnoreCase(productName)) {
                     Object priceObj = product.get("price");
-                    return priceObj != null ? priceObj.toString() : "0";
+                    if (priceObj != null) {
+                        // Перевіряємо тип і конвертуємо у формат з десятковою крапкою
+                        if (priceObj instanceof Number) {
+                            return String.valueOf(((Number) priceObj).doubleValue());
+                        } else {
+                            return priceObj.toString();
+                        }
+                    }
+                    return "0";
                 }
             }
         } catch (Exception e) {
