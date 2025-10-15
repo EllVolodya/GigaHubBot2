@@ -89,13 +89,13 @@ public class CatalogEditor {
     }
 
     // --- Додати товар у підкатегорію
-    public static boolean addProductToSubcategory(String productName, String price, String subcategoryName) {
+    public static boolean addProductToSubcategory(String productName, double price, String subcategoryName) {
         String findSubSql = "SELECT id FROM subcategories WHERE name = ?";
         String checkProductSql = "SELECT id FROM products WHERE name = ? AND subcategory_id = ?";
         String insertSql = """
-                INSERT INTO products (name, price, unit, description, photo, created_at, subcategory_id)
-                VALUES (?, ?, 'шт', '', '', CURRENT_DATE, ?)
-                """;
+            INSERT INTO products (name, price, unit, description, photo, created_at, subcategory_id)
+            VALUES (?, ?, 'шт', '', '', CURRENT_DATE, ?)
+            """;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement findSubStmt = conn.prepareStatement(findSubSql);
@@ -116,7 +116,7 @@ public class CatalogEditor {
 
             // Додати товар
             insertStmt.setString(1, productName);
-            insertStmt.setString(2, price);
+            insertStmt.setDouble(2, price); // <-- тепер double
             insertStmt.setInt(3, subcategoryId);
             insertStmt.executeUpdate();
 
@@ -190,9 +190,10 @@ public class CatalogEditor {
     }
 
     // --- Отримати ціну продукту з YAML
-    public static String getProductPriceFromYAML(String productName) {
+    // --- Отримати ціну продукту з YAML
+    public static double getProductPriceFromYAML(String productName) {
         try (InputStream inputStream = CatalogEditor.class.getClassLoader().getResourceAsStream("products.yaml")) {
-            if (inputStream == null) return "0";
+            if (inputStream == null) return 0.0;
 
             Yaml yaml = new Yaml();
             List<Map<String, Object>> products = yaml.load(inputStream);
@@ -202,21 +203,26 @@ public class CatalogEditor {
                 if (name != null && name.equalsIgnoreCase(productName)) {
                     Object priceObj = product.get("price");
                     if (priceObj != null) {
-                        // Перевіряємо тип і конвертуємо у формат з десятковою крапкою
                         if (priceObj instanceof Number) {
-                            return String.valueOf(((Number) priceObj).doubleValue());
+                            return ((Number) priceObj).doubleValue(); // повертаємо double
                         } else {
-                            return priceObj.toString();
+                            try {
+                                // конвертуємо рядок у double, замінюємо кому на крапку
+                                return Double.parseDouble(priceObj.toString().replace(",", "."));
+                            } catch (NumberFormatException e) {
+                                e.printStackTrace();
+                                return 0.0;
+                            }
                         }
                     }
-                    return "0";
+                    return 0.0;
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        return "0"; // дефолтна ціна, якщо продукт не знайдено
+        return 0.0; // дефолтна ціна, якщо продукт не знайдено
     }
 
     public static boolean subcategoryExists(String subcategoryName) {

@@ -1734,8 +1734,9 @@ public class StoreBot extends TelegramLongPollingBot {
         System.out.println("INFO: Додаємо товар '" + productName + "' у підкатегорію '" + subcategoryName + "'");
 
         // Отримуємо ціну продукту з YAML через CatalogEditor
-        String price = CatalogEditor.getProductPriceFromYAML(productName);
-        if (price == null || price.isEmpty()) price = "0"; // дефолтна ціна
+        double price = CatalogEditor.getProductPriceFromYAML(productName);
+        // дефолтна ціна, якщо не знайдено або <= 0
+        if (price <= 0.0) price = 0.0;
 
         // Перевіряємо підкатегорію
         if (!CatalogEditor.subcategoryExists(subcategoryName)) {
@@ -1744,6 +1745,7 @@ public class StoreBot extends TelegramLongPollingBot {
             return;
         }
 
+        // Тепер передаємо ціну як double
         boolean success = CatalogEditor.addProductToSubcategory(productName, price, subcategoryName);
 
         if (success) {
