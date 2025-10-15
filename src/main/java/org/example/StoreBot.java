@@ -542,22 +542,48 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 case "🗑️ Видалити замовлення" -> {
-                    int idx = adminOrderIndex.getOrDefault(userId, 0);
-                    Long orderUserId = new ArrayList<>(userOrders.keySet()).get(0);
-                    List<Map<String, Object>> orders = userOrders.get(orderUserId);
+                    try (Connection conn = DatabaseManager.getConnection()) {
+                        // Беремо перше невидалене замовлення
+                        String selectSql = "SELECT * FROM orders WHERE status != 'Видалено' ORDER BY id ASC LIMIT 1";
+                        try (PreparedStatement stmt = conn.prepareStatement(selectSql);
+                             ResultSet rs = stmt.executeQuery()) {
 
-                    if (orders == null || orders.isEmpty() || idx >= orders.size()) {
-                        sendText(chatId, "❌ Замовлення не знайдено.");
-                        return;
+                            if (!rs.isBeforeFirst()) {
+                                sendText(chatId, "Замовлень немає.");
+                                break;
+                            }
+
+                            if (rs.next()) {
+                                String orderCode = rs.getString("orderCode");
+                                Long orderUserId = rs.getLong("userId");
+
+                                // Видаляємо замовлення з бази або змінюємо статус на "Видалено"
+                                String updateSql = "UPDATE orders SET status = ?, comment = ? WHERE orderCode = ?";
+                                try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                                    updateStmt.setString(1, "Видалено");
+                                    updateStmt.setString(2, "Видалено адміністратором");
+                                    updateStmt.setString(3, orderCode);
+                                    int rows = updateStmt.executeUpdate();
+                                    if (rows == 0) {
+                                        sendText(chatId, "❌ Не вдалося видалити замовлення у базі.");
+                                        break;
+                                    }
+                                }
+
+                                // Повідомляємо користувачу
+                                sendText(orderUserId.toString(), "🗑️ Ваше замовлення було видалено адміністратором.");
+
+                                // Повідомляємо адміну
+                                sendText(chatId, "🗑️ Замовлення видалено.");
+
+                                // Показуємо наступне замовлення адміну
+                                showAdminOrder(userId, chatId);
+                            }
+                        }
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                        sendText(chatId, "❌ Помилка при видаленні замовлення.");
                     }
-
-                    Map<String, Object> order = orders.remove(idx);
-                    sendText(chatId, "🗑️ Замовлення видалено.");
-
-                    // Оновлюємо статус у файлі
-                    OrderFileManager.updateOrderStatus(order.get("orderCode").toString(), "Видалено", "Видалено адміністратором");
-
-                    showAdminOrder(userId, chatId);
                 }
 
                 case "➡️ Далі" -> {
@@ -2574,6 +2600,7 @@ public class StoreBot extends TelegramLongPollingBot {
         KeyboardRow row1 = new KeyboardRow();
         row1.add("✅ Підтвердити");
         row1.add("❌ Відхилити");
+        row1.add("🗑️ Видалити замовлення");
         keyboard.add(row1);
 
         // Ряд з кнопкою назад
