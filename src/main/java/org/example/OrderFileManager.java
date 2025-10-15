@@ -1,89 +1,127 @@
 package org.example;
 
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.Constructor;
-import org.yaml.snakeyaml.representer.Representer;
-
-import java.io.FileInputStream;
-import java.io.FileWriter;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.sql.*;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.util.*;
 
 public class OrderFileManager {
 
-    private static final String FILE_PATH = "src/main/resources/orders.yml";
-
-    private static Yaml getYaml() {
-        LoaderOptions loaderOptions = new LoaderOptions();
-        Constructor constructor = new Constructor(List.class, loaderOptions);
-
-        DumperOptions dumperOptions = new DumperOptions();
-        dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-
-        Representer representer = new Representer(dumperOptions);
-
-        return new Yaml(constructor, representer, dumperOptions);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> loadOrders() {
-        try (InputStream input = new FileInputStream(FILE_PATH)) {
-            Yaml yaml = getYaml();
-            Object data = yaml.load(input);
-            if (data == null) return new ArrayList<>();
-            System.out.println("[OrderFileManager] Orders loaded: " + ((List<?>) data).size()); // Лог
-            return (List<Map<String, Object>>) data;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new ArrayList<>();
-        }
-    }
-
-    private static void saveOrders(List<Map<String, Object>> orders) {
-        try (FileWriter writer = new FileWriter(FILE_PATH)) {
-            Yaml yaml = getYaml();
-            yaml.dump(orders, writer);
-            System.out.println("[OrderFileManager] Orders saved: " + orders.size()); // Лог
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     // Додати нове замовлення
-    public static void addOrder(Map<String, Object> orderData) {
-        List<Map<String, Object>> orders = loadOrders();
-        if (orders == null) orders = new ArrayList<>();
-        orders.add(orderData);
-        saveOrders(orders);
-        System.out.println("[OrderFileManager] New order added: " + orderData.get("orderCode"));
+    public static boolean addOrder(Map<String, Object> orderData) {
+        String sql = "INSERT INTO orders " +
+                "(orderCode, userId, deliveryType, city, address, postOffice, " +
+                "fullName, phone, card, status, comment, total, date, items) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::json)";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, (String) orderData.get("orderCode"));
+            stmt.setInt(2, (Integer) orderData.get("userId"));
+            stmt.setString(3, (String) orderData.getOrDefault("deliveryType", null));
+            stmt.setString(4, (String) orderData.getOrDefault("city", null));
+            stmt.setString(5, (String) orderData.getOrDefault("address", null));
+            stmt.setString(6, (String) orderData.getOrDefault("postOffice", null));
+            stmt.setString(7, (String) orderData.getOrDefault("fullName", null));
+            stmt.setString(8, (String) orderData.getOrDefault("phone", null));
+            stmt.setString(9, (String) orderData.getOrDefault("card", null));
+            stmt.setString(10, (String) orderData.getOrDefault("status", "Нове"));
+            stmt.setString(11, (String) orderData.getOrDefault("comment", ""));
+            stmt.setDouble(12, (Double) orderData.getOrDefault("total", 0.0));
+            stmt.setDate(13, Date.valueOf(LocalDate.now())); // поточна дата
+            stmt.setString(14, (String) orderData.getOrDefault("items", "{}")); // JSON як рядок
+
+            stmt.executeUpdate();
+            System.out.println("✅ Нове замовлення додано: " + orderData.get("orderCode"));
+            return true;
+        } catch (SQLException e) {
+            System.err.println("❌ Помилка при додаванні замовлення: " + e.getMessage());
+            return false;
+        }
     }
 
     // Оновити статус замовлення
-    public static void updateOrderStatus(String orderCode, String status, String comment) {
-        List<Map<String, Object>> orders = loadOrders();
-        for (Map<String, Object> order : orders) {
-            if (order.get("orderCode").toString().equals(orderCode)) {
-                order.put("status", status);
-                order.put("comment", comment);
-                break;
+    public static boolean updateOrderStatus(String orderCode, String status, String comment) {
+        String sql = "UPDATE orders SET status = ?, comment = ? WHERE orderCode = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, status);
+            stmt.setString(2, comment);
+            stmt.setString(3, orderCode);
+
+            int updated = stmt.executeUpdate();
+            if (updated > 0) {
+                System.out.println("✅ Статус оновлено для замовлення: " + orderCode);
+                return true;
+            } else {
+                System.out.println("⚠️ Замовлення не знайдено: " + orderCode);
+                return false;
             }
+        } catch (SQLException e) {
+            System.err.println("❌ Помилка при оновленні статусу: " + e.getMessage());
+            return false;
         }
-        saveOrders(orders);
     }
 
     // Видалити замовлення
-    public static void deleteOrder(String orderCode) {
-        List<Map<String, Object>> orders = loadOrders();
-        orders.removeIf(order -> order.get("orderCode").toString().equals(orderCode));
-        saveOrders(orders);
+    public static boolean deleteOrder(String orderCode) {
+        String sql = "DELETE FROM orders WHERE orderCode = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, orderCode);
+            int deleted = stmt.executeUpdate();
+
+            if (deleted > 0) {
+                System.out.println("🗑️ Замовлення видалено: " + orderCode);
+                return true;
+            } else {
+                System.out.println("⚠️ Замовлення не знайдено: " + orderCode);
+                return false;
+            }
+
+        } catch (SQLException e) {
+            System.err.println("❌ Помилка при видаленні: " + e.getMessage());
+            return false;
+        }
     }
 
-    // ✅ Новий метод: отримати всі замовлення (з типом доставки)
+    // Отримати всі замовлення
     public static List<Map<String, Object>> getOrders() {
-        return loadOrders();
+        List<Map<String, Object>> orders = new ArrayList<>();
+        String sql = "SELECT * FROM orders ORDER BY id DESC";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                Map<String, Object> order = new LinkedHashMap<>();
+                order.put("id", rs.getInt("id"));
+                order.put("orderCode", rs.getString("orderCode"));
+                order.put("userId", rs.getInt("userId"));
+                order.put("deliveryType", rs.getString("deliveryType"));
+                order.put("city", rs.getString("city"));
+                order.put("address", rs.getString("address"));
+                order.put("postOffice", rs.getString("postOffice"));
+                order.put("fullName", rs.getString("fullName"));
+                order.put("phone", rs.getString("phone"));
+                order.put("card", rs.getString("card"));
+                order.put("status", rs.getString("status"));
+                order.put("comment", rs.getString("comment"));
+                order.put("total", rs.getDouble("total"));
+                order.put("date", rs.getDate("date"));
+                order.put("items", rs.getString("items")); // JSON як рядок
+                orders.add(order);
+            }
+
+            System.out.println("📦 Завантажено замовлень: " + orders.size());
+        } catch (SQLException e) {
+            System.err.println("❌ Помилка при завантаженні замовлень: " + e.getMessage());
+        }
+
+        return orders;
     }
 }

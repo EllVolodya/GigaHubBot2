@@ -194,14 +194,17 @@ public class StoreBot extends TelegramLongPollingBot {
                     String inviteCode = null;
 
                     // Перевіряємо, чи є параметр invite після пробілу
-                    if (text != null && text.contains("")) {
-                        inviteCode = text.split(" ")[1].trim();
+                    if (text != null && text.contains(" ")) {
+                        String[] parts = text.split(" ");
+                        if (parts.length > 1 && !parts[1].isBlank()) { // другий елемент існує і не порожній
+                            inviteCode = parts[1].trim();
 
-                        // Збільшуємо лічильник number для цього invite
-                        if (InviteManager.incrementInviteNumber(inviteCode)) {
-                            System.out.println("✅ Лічильник number для invite " + inviteCode + " збільшено.");
-                        } else {
-                            System.out.println("❌ Invite не знайдено: " + inviteCode);
+                            // Збільшуємо лічильник number для цього invite
+                            if (InviteManager.incrementInviteNumber(inviteCode)) {
+                                System.out.println("✅ Лічильник number для invite " + inviteCode + " збільшено.");
+                            } else {
+                                System.out.println("❌ Invite не знайдено: " + inviteCode);
+                            }
                         }
                     }
 
