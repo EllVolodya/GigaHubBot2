@@ -1319,6 +1319,38 @@ public class StoreBot extends TelegramLongPollingBot {
                         userStates.put(userId, "edit_invite");
                         sendText(chatId, "✏️ Введіть дані для редагування у форматі:\nID;Name;Kasa;City");
                     }
+                    case "📄 Показати всі запрошення" -> {
+                        String sql = "SELECT * FROM invites ORDER BY id ASC";
+
+                        try (Connection conn = DatabaseManager.getConnection();
+                             PreparedStatement stmt = conn.prepareStatement(sql);
+                             ResultSet rs = stmt.executeQuery()) {
+
+                            StringBuilder sb = new StringBuilder("🔗 Список запрошень:\n");
+                            boolean hasInvites = false;
+
+                            while (rs.next()) {
+                                hasInvites = true;
+                                sb.append("ID: ").append(rs.getInt("id"))
+                                        .append(", Name: ").append(rs.getString("name"))
+                                        .append(", Kasa: ").append(rs.getString("kasa"))
+                                        .append(", City: ").append(rs.getString("city"))
+                                        .append(", Invite: ").append(rs.getString("invite"))
+                                        .append(", Number: ").append(rs.getInt("number"))
+                                        .append("\n");
+                            }
+
+                            if (!hasInvites) {
+                                sendText(chatId, "Поки що немає запрошень.");
+                            } else {
+                                sendText(chatId, sb.toString());
+                            }
+
+                        } catch (SQLException e) {
+                            e.printStackTrace();
+                            sendText(chatId, "❌ Сталася помилка при отриманні запрошень.");
+                        }
+                    }
                     case "⬅️ Назад в розробника" -> {
                         sendMessage(createDeveloperMenu(chatId));
                         userStates.remove(userId);
@@ -1834,38 +1866,6 @@ public class StoreBot extends TelegramLongPollingBot {
                 userStates.put(userId, "delete_category_select");
                 sendText(chatId, "🗑️ Введіть назву категорії, яку хочете видалити:");
             }
-            case "📄 Показати всі запрошення" -> {
-                String sql = "SELECT * FROM invites ORDER BY id ASC";
-
-                try (Connection conn = DatabaseManager.getConnection();
-                     PreparedStatement stmt = conn.prepareStatement(sql);
-                     ResultSet rs = stmt.executeQuery()) {
-
-                    StringBuilder sb = new StringBuilder("🔗 Список запрошень:\n");
-                    boolean hasInvites = false;
-
-                    while (rs.next()) {
-                        hasInvites = true;
-                        sb.append("ID: ").append(rs.getInt("id"))
-                                .append(", Name: ").append(rs.getString("name"))
-                                .append(", Kasa: ").append(rs.getString("kasa"))
-                                .append(", City: ").append(rs.getString("city"))
-                                .append(", Invite: ").append(rs.getString("invite"))
-                                .append(", Number: ").append(rs.getInt("number"))
-                                .append("\n");
-                    }
-
-                    if (!hasInvites) {
-                        sendText(chatId, "Поки що немає запрошень.");
-                    } else {
-                        sendText(chatId, sb.toString());
-                    }
-
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                    sendText(chatId, "❌ Сталася помилка при отриманні запрошень.");
-                }
-            }
             case "⬅️ Назад" -> {
                 userStates.remove(userId);
                 sendMessage(createAdminMenu(chatId));
@@ -1908,6 +1908,38 @@ public class StoreBot extends TelegramLongPollingBot {
             case "🗑️ Видалити запрошення" -> {
                 userStates.put(userId, "awaiting_delete_invite");
                 sendText(chatId, "✏️ Введіть ID запрошення, яке хочете видалити:");
+            }
+            case "📄 Показати всі запрошення" -> {
+                String sql = "SELECT * FROM invites ORDER BY id ASC";
+
+                try (Connection conn = DatabaseManager.getConnection();
+                     PreparedStatement stmt = conn.prepareStatement(sql);
+                     ResultSet rs = stmt.executeQuery()) {
+
+                    StringBuilder sb = new StringBuilder("🔗 Список запрошень:\n");
+                    boolean hasInvites = false;
+
+                    while (rs.next()) {
+                        hasInvites = true;
+                        sb.append("ID: ").append(rs.getInt("id"))
+                                .append(", Name: ").append(rs.getString("name"))
+                                .append(", Kasa: ").append(rs.getString("kasa"))
+                                .append(", City: ").append(rs.getString("city"))
+                                .append(", Invite: ").append(rs.getString("invite"))
+                                .append(", Number: ").append(rs.getInt("number"))
+                                .append("\n");
+                    }
+
+                    if (!hasInvites) {
+                        sendText(chatId, "Поки що немає запрошень.");
+                    } else {
+                        sendText(chatId, sb.toString());
+                    }
+
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "❌ Сталася помилка при отриманні запрошень.");
+                }
             }
             case "⬅️ Назад в розробника" -> sendMessage(createDeveloperMenu(chatId));
         }
