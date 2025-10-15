@@ -2527,7 +2527,6 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
-    // 🔹 Generates admin message for an order with control buttons
     // 🔹 Генерує повідомлення з замовленням і кнопками управління
     private SendMessage createOrderAdminMenu(String chatId, Map<String, Object> order, Long userId) {
         StringBuilder sb = new StringBuilder();
@@ -2553,29 +2552,26 @@ public class StoreBot extends TelegramLongPollingBot {
             default -> sb.append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
         }
 
-        // --- Розбираємо рядок item з БД ---
-        String itemsStr = order.getOrDefault("item", "").toString(); // формат: Назва:Ціна;Назва:Ціна;
+        // Список товарів з TEXT
+        String itemsStr = (String) order.get("item"); // беремо рядок із БД
         double total = 0;
-        if (!itemsStr.isEmpty()) {
-            String[] parts = itemsStr.split(";");
-            int i = 1;
-            for (String part : parts) {
-                if (part.isEmpty()) continue;
-                String[] pair = part.split(":");
+        int i = 1;
+
+        if (itemsStr != null && !itemsStr.isEmpty()) {
+            String[] itemArr = itemsStr.split(";");
+            for (String s : itemArr) {
+                if (s.isEmpty()) continue;
+                String[] pair = s.split(":");
                 String name = pair[0];
-                double price = 0;
-                if (pair.length > 1) {
-                    try {
-                        price = Double.parseDouble(pair[1]);
-                    } catch (NumberFormatException ignored) {}
-                }
-                sb.append(i++).append(". 🛒 ").append(name).append(" — ").append(price).append(" грн\n");
+                double price = Double.parseDouble(pair[1]);
+                sb.append(i++).append(". 🛒 ").append(name)
+                        .append(" — ").append(price).append(" грн\n");
                 total += price;
             }
         }
         sb.append("\n💰 Всього: ").append(total).append(" грн");
 
-        // --- Кнопки управління ---
+        // Кнопки управління замовленням
         ReplyKeyboardMarkup kb = new ReplyKeyboardMarkup();
         kb.setResizeKeyboard(true);
         List<KeyboardRow> rows = new ArrayList<>();
@@ -2595,13 +2591,6 @@ public class StoreBot extends TelegramLongPollingBot {
 
         SendMessage msg = new SendMessage(chatId, sb.toString());
         msg.setReplyMarkup(kb);
-
-        // --- Логи для відладки ---
-        System.out.println("[LOG] Створюємо повідомлення для замовлення, User ID: " + userId);
-        System.out.println("[LOG] Тип доставки: " + deliveryType);
-        System.out.println("[LOG] Рядок 'item' з БД: " + itemsStr);
-        System.out.println("[LOG] Загальна сума замовлення: " + total);
-
         return msg;
     }
 
