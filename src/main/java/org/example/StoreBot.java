@@ -2527,33 +2527,38 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
-    // 🔹 Генерує повідомлення з замовленням і кнопками управління
+    // 🔹 Generates admin message for an order with control buttons
     private SendMessage createOrderAdminMenu(String chatId, Map<String, Object> order, Long userId) {
         StringBuilder sb = new StringBuilder();
-        sb.append("🆔 User ID: ").append(userId).append("\n")
-                .append("🔢 Код замовлення: ").append(order.get("orderCode")).append("\n")
-                .append("📦 Тип замовлення: ").append(order.getOrDefault("deliveryType", "Доставка")).append("\n\n");
+        System.out.println("[LOG] Generating message for order, User ID: " + userId);
 
-        String deliveryType = order.getOrDefault("deliveryType", "Доставка").toString();
+        sb.append("🆔 User ID: ").append(userId).append("\n")
+                .append("🔢 Order Code: ").append(order.get("orderCode")).append("\n")
+                .append("📦 Delivery Type: ").append(order.getOrDefault("deliveryType", "Delivery")).append("\n\n");
+
+        String deliveryType = order.getOrDefault("deliveryType", "Delivery").toString();
+        System.out.println("[LOG] Delivery type: " + deliveryType);
 
         switch (deliveryType) {
-            case "Самовивіз" -> sb.append("🏙 Місто: ").append(order.getOrDefault("city", "Невідомо")).append("\n")
-                    .append("👤 П.І.: ").append(order.getOrDefault("fullName", "Невідомо")).append("\n")
-                    .append("📞 Телефон: ").append(order.getOrDefault("phone", "Невідомо")).append("\n")
-                    .append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
-            case "Доставка по місту" -> sb.append("🏠 Адреса: ").append(order.getOrDefault("address", "Невідомо")).append("\n")
-                    .append("👤 П.І.: ").append(order.getOrDefault("fullName", "Невідомо")).append("\n")
-                    .append("📞 Телефон: ").append(order.getOrDefault("phone", "Невідомо")).append("\n")
-                    .append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
-            case "Нова пошта" -> sb.append("📮 Відділення НП: ").append(order.getOrDefault("postOffice", "Невідомо")).append("\n")
-                    .append("👤 П.І.: ").append(order.getOrDefault("fullName", "Невідомо")).append("\n")
-                    .append("📞 Телефон: ").append(order.getOrDefault("phone", "Невідомо")).append("\n")
-                    .append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
-            default -> sb.append("💳 Картка: ").append(order.getOrDefault("card", "Немає")).append("\n\n");
+            case "Самовивіз" -> sb.append("🏙 City: ").append(order.getOrDefault("city", "Unknown")).append("\n")
+                    .append("👤 Full Name: ").append(order.getOrDefault("fullName", "Unknown")).append("\n")
+                    .append("📞 Phone: ").append(order.getOrDefault("phone", "Unknown")).append("\n")
+                    .append("💳 Card: ").append(order.getOrDefault("card", "None")).append("\n\n");
+            case "Доставка по місту" -> sb.append("🏠 Address: ").append(order.getOrDefault("address", "Unknown")).append("\n")
+                    .append("👤 Full Name: ").append(order.getOrDefault("fullName", "Unknown")).append("\n")
+                    .append("📞 Phone: ").append(order.getOrDefault("phone", "Unknown")).append("\n")
+                    .append("💳 Card: ").append(order.getOrDefault("card", "None")).append("\n\n");
+            case "Нова пошта" -> sb.append("📮 Post Office: ").append(order.getOrDefault("postOffice", "Unknown")).append("\n")
+                    .append("👤 Full Name: ").append(order.getOrDefault("fullName", "Unknown")).append("\n")
+                    .append("📞 Phone: ").append(order.getOrDefault("phone", "Unknown")).append("\n")
+                    .append("💳 Card: ").append(order.getOrDefault("card", "None")).append("\n\n");
+            default -> sb.append("💳 Card: ").append(order.getOrDefault("card", "None")).append("\n\n");
         }
 
-        // 🔹 Список товарів — розбираємо рядок item
-        String itemsStr = order.getOrDefault("item", "").toString(); // Назва:Ціна;Назва:Ціна;
+        // 🔹 Log the 'item' string
+        String itemsStr = order.getOrDefault("item", "").toString();
+        System.out.println("[LOG] 'item' string from DB: " + itemsStr);
+
         double total = 0;
         int i = 1;
         if (!itemsStr.isEmpty()) {
@@ -2563,25 +2568,27 @@ public class StoreBot extends TelegramLongPollingBot {
                 String[] pair = part.split(":");
                 String name = pair[0];
                 double price = pair.length > 1 ? Double.parseDouble(pair[1]) : 0;
-                sb.append(i++).append(". 🛒 ").append(name).append(" — ").append(price).append(" грн\n");
+                sb.append(i++).append(". 🛒 ").append(name).append(" — ").append(price).append(" UAH\n");
                 total += price;
+                System.out.println("[LOG] Added product: " + name + ", price: " + price);
             }
         }
-        sb.append("\n💰 Всього: ").append(total).append(" грн");
+        sb.append("\n💰 Total: ").append(total).append(" UAH");
+        System.out.println("[LOG] Total order sum: " + total);
 
-        // 🔹 Кнопки управління замовленням
+        // 🔹 Admin buttons
         ReplyKeyboardMarkup kb = new ReplyKeyboardMarkup();
         kb.setResizeKeyboard(true);
         List<KeyboardRow> rows = new ArrayList<>();
 
         KeyboardRow r1 = new KeyboardRow();
-        r1.add("✅ Підтвердити замовлення");
-        r1.add("❌ Відхилити замовлення");
-        r1.add("🗑️ Видалити замовлення");
+        r1.add("✅ Confirm Order");
+        r1.add("❌ Reject Order");
+        r1.add("🗑️ Delete Order");
 
         KeyboardRow r2 = new KeyboardRow();
-        r2.add("➡️ Далі");
-        r2.add("⬅️ Назад в адмін-меню");
+        r2.add("➡️ Next");
+        r2.add("⬅️ Back to Admin Menu");
 
         rows.add(r1);
         rows.add(r2);
@@ -2589,6 +2596,9 @@ public class StoreBot extends TelegramLongPollingBot {
 
         SendMessage msg = new SendMessage(chatId, sb.toString());
         msg.setReplyMarkup(kb);
+
+        System.out.println("[LOG] Admin message created.");
+
         return msg;
     }
 
