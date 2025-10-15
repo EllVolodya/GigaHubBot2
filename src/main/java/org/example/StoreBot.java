@@ -1163,10 +1163,13 @@ public class StoreBot extends TelegramLongPollingBot {
                     else if (priceObj != null) {
                         try { price = Double.parseDouble(priceObj.toString()); } catch (NumberFormatException ignored) {}
                     }
+
                     itemsDb.append(name).append(":").append(price).append(";");
+                    total += price; // ✅ ось цього не вистачало
                 }
 
-                System.out.println("DEBUG itemsDb: " + itemsDb.toString());
+                System.out.println("DEBUG itemsDb: " + itemsDb);
+                System.out.println("DEBUG total: " + total);
 
                 try (Connection conn = DatabaseManager.getConnection()) {
                     // INSERT в БД
