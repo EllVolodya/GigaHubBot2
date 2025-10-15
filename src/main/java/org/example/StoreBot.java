@@ -1326,18 +1326,17 @@ public class StoreBot extends TelegramLongPollingBot {
                              PreparedStatement stmt = conn.prepareStatement(sql);
                              ResultSet rs = stmt.executeQuery()) {
 
-                            StringBuilder sb = new StringBuilder("🔗 Список запрошень:\n");
+                            StringBuilder sb = new StringBuilder("🔗 Статистика запрошень:\n\n");
                             boolean hasInvites = false;
 
                             while (rs.next()) {
                                 hasInvites = true;
-                                sb.append("ID: ").append(rs.getInt("id"))
-                                        .append(", Name: ").append(rs.getString("name"))
-                                        .append(", Kasa: ").append(rs.getString("kasa"))
-                                        .append(", City: ").append(rs.getString("city"))
-                                        .append(", Invite: ").append(rs.getString("invite"))
-                                        .append(", Number: ").append(rs.getInt("number"))
-                                        .append("\n");
+                                sb.append("🆔 ID: ").append(rs.getInt("id")).append("\n")
+                                        .append("👤 Ім'я: ").append(rs.getString("name")).append("\n")
+                                        .append("💰 Каса: ").append(rs.getString("kasa")).append("\n")
+                                        .append("🏙️ Місто: ").append(rs.getString("city")).append("\n")
+                                        .append("📈 Кількість переходів: ").append(rs.getInt("number")).append("\n")
+                                        .append("-----------------------------\n");
                             }
 
                             if (!hasInvites) {
