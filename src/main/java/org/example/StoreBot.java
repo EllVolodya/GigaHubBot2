@@ -501,37 +501,40 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 case "✅ Підтвердити" -> {
-                    int idx = adminOrderIndex.getOrDefault(userId, 0);
-                    if (userOrders.isEmpty()) {
-                        sendText(chatId, "Замовлень немає.");
-                        break;
-                    }
+                    try (Connection conn = DatabaseManager.getConnection()) {
+                        // Витягаємо перше нове замовлення з бази для цього адміну
+                        String selectSql = "SELECT * FROM orders WHERE status = 'Нове' ORDER BY id ASC LIMIT 1";
+                        try (PreparedStatement stmt = conn.prepareStatement(selectSql);
+                             ResultSet rs = stmt.executeQuery()) {
 
-                    Long orderUserId = new ArrayList<>(userOrders.keySet()).get(0); // перший користувач
-                    List<Map<String, Object>> ordersList = userOrders.get(orderUserId);
-                    if (ordersList.isEmpty()) {
-                        sendText(chatId, "Замовлень немає.");
-                        break;
-                    }
+                            if (!rs.next()) {
+                                sendText(chatId, "Замовлень немає.");
+                                break;
+                            }
 
-                    Map<String, Object> order = ordersList.get(idx);
+                            // Отримуємо дані замовлення
+                            Long orderId = rs.getLong("id");
+                            String orderCode = rs.getString("orderCode");
+                            Long orderUserId = rs.getLong("userId");
 
-                    // Надсилаємо користувачу повідомлення
-                    sendText(orderUserId.toString(), "✅ Ваше замовлення підтверджено! Очікуйте доставку.");
+                            // Надсилаємо користувачу повідомлення
+                            sendText(orderUserId.toString(), "✅ Ваше замовлення підтверджено! Очікуйте доставку.");
 
-                    // Оновлюємо файл і статус
-                    OrderFileManager.updateOrderStatus(order.get("orderCode").toString(), "Підтверджено", "");
+                            // Оновлюємо статус в базі
+                            String updateSql = "UPDATE orders SET status = 'Підтверджено' WHERE id = ?";
+                            try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                                updateStmt.setLong(1, orderId);
+                                updateStmt.executeUpdate();
+                            }
 
-                    // Видаляємо замовлення з пам'яті
-                    ordersList.remove(idx);
+                            sendText(chatId, "Замовлення підтверджено ✅");
 
-                    sendText(chatId, "Замовлення підтверджено ✅");
-
-                    // Оновлюємо відображення адміну
-                    if (ordersList.isEmpty()) {
-                        sendText(chatId, "Замовлень немає.");
-                    } else {
-                        showAdminOrder(userId, chatId);
+                            // Відображаємо наступне замовлення адміну (якщо є)
+                            showAdminOrder(userId, chatId);
+                        }
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                        sendText(chatId, "❌ Помилка при підтвердженні замовлення.");
                     }
                 }
 
