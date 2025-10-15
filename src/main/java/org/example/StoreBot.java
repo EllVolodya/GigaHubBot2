@@ -1733,26 +1733,21 @@ public class StoreBot extends TelegramLongPollingBot {
 
         System.out.println("INFO: Adding product '" + productName + "' to subcategory '" + subcategoryName + "'");
 
-        // --- Get product price from YAML
+        // --- Get price from YAML
         double price = CatalogEditor.getProductPriceFromYAML(productName);
-        System.out.println("DEBUG: Price from YAML for '" + productName + "' = " + price);
-
         if (price <= 0.0) {
             System.out.println("DEBUG: Price <= 0, setting default 0.0");
             price = 0.0;
         }
 
-        // --- Check if subcategory exists
-        boolean subExists = CatalogEditor.subcategoryExists(subcategoryName);
-        System.out.println("DEBUG: Does subcategory '" + subcategoryName + "' exist? " + subExists);
-        if (!subExists) {
+        // --- Check subcategory
+        if (!CatalogEditor.subcategoryExists(subcategoryName)) {
             sendText(chatId, "❌ Subcategory '" + subcategoryName + "' not found in MySQL database.");
             userStates.remove(userId);
             return;
         }
 
-        // --- Add product to subcategory
-        System.out.println("DEBUG: Calling addProductToSubcategory with price = " + price);
+        // --- Add product
         boolean success = CatalogEditor.addProductToSubcategory(productName, price, subcategoryName);
 
         if (success) {
@@ -1762,7 +1757,6 @@ public class StoreBot extends TelegramLongPollingBot {
                     "' to subcategory '" + subcategoryName + "'. It might already exist.");
         }
 
-        // --- Clean up user state
         userStates.remove(userId);
     }
 

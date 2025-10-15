@@ -93,9 +93,9 @@ public class CatalogEditor {
         String findSubSql = "SELECT id FROM subcategories WHERE name = ?";
         String checkProductSql = "SELECT id FROM products WHERE name = ? AND subcategory_id = ?";
         String insertSql = """
-            INSERT INTO products (name, price, unit, description, photo, created_at, subcategory_id)
-            VALUES (?, ?, ?, ?, ?, CURRENT_DATE, ?)
-            """;
+        INSERT INTO products (name, price, unit, description, photo, created_at, subcategory_id)
+        VALUES (?, ?, ?, ?, ?, CURRENT_DATE, ?)
+        """;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement findSubStmt = conn.prepareStatement(findSubSql);
@@ -105,26 +105,33 @@ public class CatalogEditor {
             // Знайти підкатегорію
             findSubStmt.setString(1, subcategoryName);
             ResultSet subRs = findSubStmt.executeQuery();
-            if (!subRs.next()) return false;
+            if (!subRs.next()) {
+                System.out.println("DEBUG: Subcategory '" + subcategoryName + "' not found");
+                return false;
+            }
             int subcategoryId = subRs.getInt("id");
 
-            // Перевірити, чи товар уже є
+            // Перевірити, чи товар уже існує
             checkStmt.setString(1, productName);
             checkStmt.setInt(2, subcategoryId);
             ResultSet rs = checkStmt.executeQuery();
-            if (rs.next()) return false;
+            if (rs.next()) {
+                System.out.println("DEBUG: Product '" + productName + "' already exists in subcategory");
+                return false;
+            }
 
-            // Додати товар
+            // Вставка продукту
             insertStmt.setString(1, productName);
-            insertStmt.setDouble(2, price); // вставляємо double
+            insertStmt.setDouble(2, price);
             insertStmt.setString(3, "шт"); // default unit
             insertStmt.setString(4, "");    // default description
             insertStmt.setString(5, "");    // default photo
             insertStmt.setInt(6, subcategoryId);
 
+            System.out.println("DEBUG: Inserting product '" + productName + "' with price " + price);
             insertStmt.executeUpdate();
 
-            System.out.println("✅ Товар '" + productName + "' додано у підкатегорію '" + subcategoryName + "'");
+            System.out.println("✅ Product '" + productName + "' added to subcategory '" + subcategoryName + "'");
             return true;
 
         } catch (SQLException e) {
@@ -196,35 +203,44 @@ public class CatalogEditor {
     // --- Отримати ціну продукту з YAML
     public static double getProductPriceFromYAML(String productName) {
         try (InputStream inputStream = CatalogEditor.class.getClassLoader().getResourceAsStream("products.yaml")) {
-            if (inputStream == null) return 0.0;
+            if (inputStream == null) {
+                System.out.println("DEBUG: products.yaml not found");
+                return 0.0;
+            }
 
             Yaml yaml = new Yaml();
             List<Map<String, Object>> products = yaml.load(inputStream);
 
             for (Map<String, Object> product : products) {
-                String name = (String) product.get("name");
-                if (name != null && name.equalsIgnoreCase(productName)) {
+                Object nameObj = product.get("name");
+                if (nameObj == null) continue;
+
+                String name = nameObj.toString().trim();
+                System.out.println("DEBUG: Checking YAML product name: '" + name + "' against '" + productName + "'");
+
+                // Використовуємо equalsIgnoreCase та contains для гнучкого пошуку
+                if (name.equalsIgnoreCase(productName.trim()) || name.contains(productName.trim())) {
                     Object priceObj = product.get("price");
                     if (priceObj != null) {
-                        if (priceObj instanceof Number) {
-                            return ((Number) priceObj).doubleValue();
-                        } else {
-                            try {
-                                return Double.parseDouble(priceObj.toString().replace(",", "."));
-                            } catch (NumberFormatException e) {
-                                e.printStackTrace();
-                                return 0.0;
-                            }
+                        try {
+                            double price = Double.parseDouble(priceObj.toString().replace(",", ".").trim());
+                            System.out.println("DEBUG: Found price = " + price);
+                            return price;
+                        } catch (NumberFormatException e) {
+                            e.printStackTrace();
+                            return 0.0;
                         }
                     }
                     return 0.0;
                 }
             }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        return 0.0;
+        System.out.println("DEBUG: Product '" + productName + "' not found in YAML");
+        return 0.0; // дефолтна ціна, якщо продукт не знайдено
     }
 
     // --- Перевірка існування підкатегорії
