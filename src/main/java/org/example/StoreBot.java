@@ -516,10 +516,8 @@ public class StoreBot extends TelegramLongPollingBot {
                             String orderCode = rs.getString("orderCode");
                             Long orderUserId = rs.getLong("userId");
 
-                            // Надсилаємо користувачу повідомлення
                             sendText(orderUserId.toString(), "✅ Ваше замовлення підтверджено! Очікуйте доставку.");
 
-                            // Оновлюємо статус в базі
                             String updateSql = "UPDATE orders SET status = 'Підтверджено' WHERE id = ?";
                             try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
                                 updateStmt.setLong(1, orderId);
@@ -529,7 +527,8 @@ public class StoreBot extends TelegramLongPollingBot {
                             sendText(chatId, "Замовлення підтверджено ✅");
 
                             // Показуємо адміну наступне замовлення
-                            showAdminOrder(userId, chatId);
+                            Long adminId = userId;
+                            showAdminOrder(adminId, chatId);
                         }
                     } catch (SQLException e) {
                         e.printStackTrace();
@@ -2628,8 +2627,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
     private void showAdminOrder(Long adminId, String chatId) {
         try (Connection conn = DatabaseManager.getConnection()) {
-
-            String sql = "SELECT * FROM orders ORDER BY id ASC LIMIT 1";
+            String sql = "SELECT * FROM orders WHERE status = 'Нове' ORDER BY id ASC LIMIT 1";
             try (PreparedStatement stmt = conn.prepareStatement(sql);
                  ResultSet rs = stmt.executeQuery()) {
 
@@ -2654,21 +2652,17 @@ public class StoreBot extends TelegramLongPollingBot {
                     order.put("date", rs.getDate("date"));
                     order.put("item", rs.getString("item"));
 
-                    // 🔹 Отримуємо total типобезпечно
-                    double total = 0.0;
                     Object totalObj = rs.getObject("total");
-                    if (totalObj instanceof Number) {
-                        total = ((Number) totalObj).doubleValue();
-                    } else if (totalObj != null) {
+                    double total = 0.0;
+                    if (totalObj instanceof Number) total = ((Number) totalObj).doubleValue();
+                    else if (totalObj != null) {
                         try { total = Double.parseDouble(totalObj.toString()); } catch (Exception ignored) {}
                     }
                     order.put("total", total);
 
-                    // 🔹 Відправляємо адміну оформлене повідомлення
                     createOrderAdminMenu(chatId, order, rs.getLong("userId"));
                 }
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
             sendText(chatId, "❌ Помилка при завантаженні замовлень з бази.");
