@@ -2680,17 +2680,14 @@ public class StoreBot extends TelegramLongPollingBot {
 
     private void showAdminOrder(Long adminId, String chatId) {
         try (Connection conn = DatabaseManager.getConnection()) {
-            // Беремо тільки активні замовлення
-            String sql = "SELECT * FROM orders WHERE status NOT IN ('Видалено', 'Підтверджено', 'Відхилено') ORDER BY id ASC LIMIT 1";
+
+            // Беремо всі активні замовлення
+            String sql = "SELECT * FROM orders WHERE status != 'Видалено' ORDER BY id ASC";
+            List<Map<String, Object>> orders = new ArrayList<>();
             try (PreparedStatement stmt = conn.prepareStatement(sql);
                  ResultSet rs = stmt.executeQuery()) {
 
-                if (!rs.isBeforeFirst()) {
-                    sendText(chatId, "Замовлень немає.");
-                    return;
-                }
-
-                if (rs.next()) {
+                while (rs.next()) {
                     Map<String, Object> order = new HashMap<>();
                     order.put("id", rs.getInt("id"));
                     order.put("orderCode", rs.getString("orderCode"));
@@ -2706,17 +2703,31 @@ public class StoreBot extends TelegramLongPollingBot {
                     order.put("date", rs.getDate("date"));
                     order.put("item", rs.getString("item"));
 
-                    double total = 0.0;
                     Object totalObj = rs.getObject("total");
+                    double total = 0;
                     if (totalObj instanceof Number) total = ((Number) totalObj).doubleValue();
                     else if (totalObj != null) {
                         try { total = Double.parseDouble(totalObj.toString()); } catch (Exception ignored) {}
                     }
                     order.put("total", total);
 
-                    createOrderAdminMenu(chatId, order, rs.getLong("userId"));
+                    orders.add(order);
                 }
             }
+
+            if (orders.isEmpty()) {
+                sendText(chatId, "Замовлень немає.");
+                return;
+            }
+
+            // Визначаємо який індекс показувати
+            int idx = adminOrderIndex.getOrDefault(adminId, 0);
+            if (idx >= orders.size()) idx = orders.size() - 1; // щоб не виходило за межі
+            Map<String, Object> orderToShow = orders.get(idx);
+
+            // Показуємо адміну
+            createOrderAdminMenu(chatId, orderToShow, orderToShow.get("userId") instanceof Long ? (Long) orderToShow.get("userId") : 0L);
+
         } catch (SQLException e) {
             e.printStackTrace();
             sendText(chatId, "❌ Помилка при завантаженні замовлень з бази.");
