@@ -2528,23 +2528,30 @@ public class StoreBot extends TelegramLongPollingBot {
         }
         sb.append("\n💰 Всього: ").append(total).append(" грн");
 
-        // 🔹 Кнопки як рядки під повідомленням
+        // 🔹 Кнопки як ряди під повідомленням
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         keyboardMarkup.setResizeKeyboard(true);
         keyboardMarkup.setOneTimeKeyboard(false);
 
         List<KeyboardRow> keyboard = new ArrayList<>();
-        KeyboardRow row = new KeyboardRow();
-        row.add("✅ Підтвердити");
-        row.add("❌ Відхилити");
-        keyboard.add(row);
+
+        // Ряд з підтвердженням і відхиленням
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add("✅ Підтвердити");
+        row1.add("❌ Відхилити");
+        keyboard.add(row1);
+
+        // Ряд з кнопкою назад
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add("⬅️ Назад");
+        keyboard.add(row2);
 
         keyboardMarkup.setKeyboard(keyboard);
 
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(sb.toString());
-        message.setReplyMarkup(keyboardMarkup); // ⬅️ Кнопки під повідомленням
+        message.setReplyMarkup(keyboardMarkup);
 
         try {
             execute(message);
