@@ -543,8 +543,8 @@ public class StoreBot extends TelegramLongPollingBot {
 
                 case "🗑️ Видалити замовлення" -> {
                     try (Connection conn = DatabaseManager.getConnection()) {
-                        // Беремо перше невидалене замовлення
-                        String selectSql = "SELECT * FROM orders WHERE status != 'Видалено' ORDER BY id ASC LIMIT 1";
+                        // Беремо перше активне замовлення
+                        String selectSql = "SELECT * FROM orders WHERE status NOT IN ('Видалено', 'Підтверджено', 'Відхилено') ORDER BY id ASC LIMIT 1";
                         try (PreparedStatement stmt = conn.prepareStatement(selectSql);
                              ResultSet rs = stmt.executeQuery()) {
 
@@ -557,17 +557,13 @@ public class StoreBot extends TelegramLongPollingBot {
                                 String orderCode = rs.getString("orderCode");
                                 Long orderUserId = rs.getLong("userId");
 
-                                // Видаляємо замовлення з бази або змінюємо статус на "Видалено"
+                                // Оновлюємо статус на "Видалено"
                                 String updateSql = "UPDATE orders SET status = ?, comment = ? WHERE orderCode = ?";
                                 try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
                                     updateStmt.setString(1, "Видалено");
                                     updateStmt.setString(2, "Видалено адміністратором");
                                     updateStmt.setString(3, orderCode);
-                                    int rows = updateStmt.executeUpdate();
-                                    if (rows == 0) {
-                                        sendText(chatId, "❌ Не вдалося видалити замовлення у базі.");
-                                        break;
-                                    }
+                                    updateStmt.executeUpdate();
                                 }
 
                                 // Повідомляємо користувачу
@@ -576,7 +572,7 @@ public class StoreBot extends TelegramLongPollingBot {
                                 // Повідомляємо адміну
                                 sendText(chatId, "🗑️ Замовлення видалено.");
 
-                                // Показуємо наступне замовлення адміну
+                                // Показуємо наступне активне замовлення
                                 showAdminOrder(userId, chatId);
                             }
                         }
@@ -2666,7 +2662,8 @@ public class StoreBot extends TelegramLongPollingBot {
 
     private void showAdminOrder(Long adminId, String chatId) {
         try (Connection conn = DatabaseManager.getConnection()) {
-            String sql = "SELECT * FROM orders WHERE status = 'Нове' ORDER BY id ASC LIMIT 1";
+            // Беремо тільки активні замовлення
+            String sql = "SELECT * FROM orders WHERE status NOT IN ('Видалено', 'Підтверджено', 'Відхилено') ORDER BY id ASC LIMIT 1";
             try (PreparedStatement stmt = conn.prepareStatement(sql);
                  ResultSet rs = stmt.executeQuery()) {
 
@@ -2691,8 +2688,8 @@ public class StoreBot extends TelegramLongPollingBot {
                     order.put("date", rs.getDate("date"));
                     order.put("item", rs.getString("item"));
 
-                    Object totalObj = rs.getObject("total");
                     double total = 0.0;
+                    Object totalObj = rs.getObject("total");
                     if (totalObj instanceof Number) total = ((Number) totalObj).doubleValue();
                     else if (totalObj != null) {
                         try { total = Double.parseDouble(totalObj.toString()); } catch (Exception ignored) {}
