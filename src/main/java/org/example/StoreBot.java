@@ -502,7 +502,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
                 case "✅ Підтвердити" -> {
                     try (Connection conn = DatabaseManager.getConnection()) {
-                        // Витягаємо перше нове замовлення з бази
+                        // Витягаємо перше нове замовлення
                         String selectSql = "SELECT * FROM orders WHERE status = 'Нове' ORDER BY id ASC LIMIT 1";
                         try (PreparedStatement stmt = conn.prepareStatement(selectSql);
                              ResultSet rs = stmt.executeQuery()) {
@@ -512,7 +512,6 @@ public class StoreBot extends TelegramLongPollingBot {
                                 break;
                             }
 
-                            // Отримуємо дані замовлення
                             Long orderId = rs.getLong("id");
                             String orderCode = rs.getString("orderCode");
                             Long orderUserId = rs.getLong("userId");
@@ -529,7 +528,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
                             sendText(chatId, "Замовлення підтверджено ✅");
 
-                            // Відображаємо наступне замовлення адміну (якщо є)
+                            // Показуємо адміну наступне замовлення
                             showAdminOrder(userId, chatId);
                         }
                     } catch (SQLException e) {
