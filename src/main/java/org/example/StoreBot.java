@@ -833,29 +833,34 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
-    // 🔹 Показ наступного товару
+    // 🔹 Показ наступного товару по id
     private void showNextProduct(Long chatId) throws TelegramApiException {
-        List<Map<String, Object>> products = catalogSearcher.getProducts(
-                currentCategory.get(chatId), currentSubcategory.get(chatId)
-        );
+        String category = currentCategory.get(chatId);
+        String subcategory = currentSubcategory.get(chatId);
+
+        int index = productIndex.getOrDefault(chatId, 0);
+
+        CatalogSearcher searcher = new CatalogSearcher();
+        List<Map<String, Object>> products = searcher.getProducts(category, subcategory);
 
         if (products == null || products.isEmpty()) {
             sendText(chatId, "❌ У цій підкатегорії немає товарів.");
             return;
         }
 
-        // Беремо індекс товару
-        int index = productIndex.getOrDefault(chatId, 0);
-        Map<String, Object> product = products.get(index);
+        // Сортуємо по id, щоб показ був завжди у порядку
+        products.sort(Comparator.comparingInt(p -> ((Number) p.get("id")).intValue()));
 
-        // Зберігаємо останній показаний товар
+        if (index >= products.size() || index < 0) index = 0;
+
+        Map<String, Object> product = products.get(index);
         lastShownProduct.put(chatId, product);
 
         String name = product.getOrDefault("name", "Без назви").toString();
         String price = product.getOrDefault("price", "N/A").toString();
         String unit = product.getOrDefault("unit", "шт").toString();
         String description = product.getOrDefault("description", "").toString();
-        String photoPath = product.getOrDefault("photo", "").toString();
+        String photo = product.getOrDefault("photo", "").toString();
         String manufacturer = product.getOrDefault("manufacturer", "").toString();
 
         StringBuilder sb = new StringBuilder("📦 ").append(name)
@@ -863,28 +868,28 @@ public class StoreBot extends TelegramLongPollingBot {
         if (!manufacturer.isEmpty()) sb.append("\n🏭 Виробник: ").append(manufacturer);
         if (!description.isEmpty()) sb.append("\n📖 ").append(description);
 
-        // Створюємо клавіатуру
+        // Кнопки
         KeyboardRow row = new KeyboardRow();
         row.add("➡ Далі");
         row.add("🛒 Додати в кошик");
+        row.add("🛒 Перейти в кошик");
 
-        List<KeyboardRow> kb = new ArrayList<>();
-        kb.add(row);
-        kb.add(new KeyboardRow(List.of(new KeyboardButton("⬅ Назад"))));
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        keyboard.add(row);
+        keyboard.add(new KeyboardRow(List.of(new KeyboardButton("⬅ Назад"))));
 
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
+        markup.setKeyboard(keyboard);
         markup.setResizeKeyboard(true);
-        markup.setKeyboard(kb);
 
-        // Відправляємо повідомлення з клавіатурою
-        if (photoPath != null && !photoPath.isEmpty()) {
-            String fileName = new java.io.File(photoPath).getName();
-            sendPhotoFromResources(chatId.toString(), fileName, sb.toString(), markup);
+        // Відправка фото або тексту
+        if (photo != null && !photo.isEmpty()) {
+            sendPhotoFromResources(chatId.toString(), photo, sb.toString(), markup);
         } else {
             sendTextWithMarkup(chatId, sb.toString(), markup);
         }
 
-        // Після показу товару збільшуємо індекс
+        // Збільшуємо індекс для наступного показу
         index = (index + 1) % products.size();
         productIndex.put(chatId, index);
     }
@@ -2499,6 +2504,7 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
+    // Показ товару
     private void sendProduct(Long chatId) throws TelegramApiException {
         String category = currentCategory.get(chatId);
         String subcategory = currentSubcategory.get(chatId);
@@ -2510,12 +2516,12 @@ public class StoreBot extends TelegramLongPollingBot {
         List<Map<String, Object>> products = searcher.getProducts(category, subcategory);
 
         if (products == null || products.isEmpty()) {
-            sendText(String.valueOf(chatId), "❌ У цій підкатегорії немає товарів.");
+            sendText(chatId, "❌ У цій підкатегорії немає товарів.");
             return;
         }
 
-        // Впорядкування по id
-        products.sort(Comparator.comparingInt(p -> (int) p.get("id")));
+        // Впорядкування по id для гарантованого порядку
+        products.sort(Comparator.comparingInt(p -> ((Number) p.get("id")).intValue()));
 
         // Переконаємось, що index в допустимому діапазоні
         if (index >= products.size() || index < 0) index = 0;
@@ -2549,8 +2555,9 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setKeyboard(keyboard);
         markup.setResizeKeyboard(true);
 
+        // Відправка фото або тексту
         if (photo != null && !photo.isEmpty()) {
-            sendPhotoFromResources(String.valueOf(chatId), photo, sb.toString(), markup);
+            sendPhotoFromResources(chatId.toString(), photo, sb.toString(), markup);
         } else {
             sendTextWithMarkup(chatId, sb.toString(), markup);
         }
