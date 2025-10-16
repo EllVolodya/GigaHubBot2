@@ -2,7 +2,6 @@ package org.example;
 
 import java.sql.*;
 import java.util.*;
-import java.io.IOException;  // обов'язково
 
 import java.util.*;
 import java.util.List;                       // для List
@@ -28,27 +27,38 @@ public class CatalogSearcher {
             WHERE LOWER(p.name) LIKE ?
             """;
 
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
 
+        try {
+            conn = DatabaseManager.getConnection(); // ⚡ бере вже активне з’єднання
+            ps = conn.prepareStatement(sql);
             ps.setString(1, "%" + keywords.toLowerCase() + "%");
 
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    Map<String, Object> product = new HashMap<>();
-                    product.put("id", rs.getInt("id"));
-                    product.put("name", rs.getString("name"));
-                    product.put("price", rs.getString("price"));
-                    product.put("subcategory", rs.getString("subcategory"));
-                    product.put("category", rs.getString("category"));
-                    results.add(product);
-                }
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> product = new HashMap<>();
+                product.put("id", rs.getInt("id"));
+                product.put("name", rs.getString("name"));
+                product.put("price", rs.getString("price"));
+                product.put("subcategory", rs.getString("subcategory"));
+                product.put("category", rs.getString("category"));
+                results.add(product);
             }
 
         } catch (SQLException e) {
             e.printStackTrace();
+            System.err.println("❌ Error executing product search query: " + e.getMessage());
+        } finally {
+            // Закриваємо тільки statement і resultset — з’єднання залишається активним
+            try {
+                if (rs != null) rs.close();
+                if (ps != null) ps.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
-
         return results;
     }
 

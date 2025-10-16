@@ -13,10 +13,6 @@ public class Main {
     private static final Logger logger = Logger.getLogger(Main.class.getName());
 
     public static void main(String[] args) {
-        // Підключення до бази даних
-        DatabaseManager.connect();
-
-        // Перевірка підключення
         try (Connection conn = DatabaseManager.getConnection()) {
             if (conn != null && !conn.isClosed()) {
                 System.out.println("✅ Database is connected successfully!");
@@ -31,7 +27,6 @@ public class Main {
         try {
             String token = System.getenv("BOT_TOKEN");
             if (token == null || token.isBlank()) {
-                logger.severe("BOT_TOKEN environment variable is not set. Exiting.");
                 System.err.println("ERROR: BOT_TOKEN environment variable is not set.");
                 DatabaseManager.disconnect();
                 System.exit(1);
@@ -41,11 +36,10 @@ public class Main {
             StoreBot bot = new StoreBot(token);
             botsApi.registerBot(bot);
 
-            logger.info("Bot started successfully!");
+            System.out.println("Bot started successfully!");
         } catch (TelegramApiException e) {
-            logger.log(Level.SEVERE, "Failed to start bot", e);
+            e.printStackTrace();
         } finally {
-            // Закриваємо підключення при завершенні програми
             Runtime.getRuntime().addShutdownHook(new Thread(DatabaseManager::disconnect));
         }
     }

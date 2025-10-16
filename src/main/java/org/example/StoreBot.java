@@ -518,21 +518,23 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 case "🛒 Замовлення користувачів" -> {
-                    try (Connection conn = DatabaseManager.getConnection()) {
+                    try {
+                        Connection conn = DatabaseManager.getConnection();
+
                         // Перевіряємо, чи є замовлення в базі
                         String countSql = "SELECT COUNT(*) FROM orders";
-                        try (PreparedStatement countStmt = conn.prepareStatement(countSql)) {
-                            ResultSet countRs = countStmt.executeQuery();
-                            if (countRs.next() && countRs.getInt(1) == 0) {
-                                sendText(chatId, "Поки що немає замовлень.");
-                                return;
-                            }
+                        PreparedStatement countStmt = conn.prepareStatement(countSql);
+                        ResultSet countRs = countStmt.executeQuery();
+                        if (countRs.next() && countRs.getInt(1) == 0) {
+                            sendText(chatId, "Поки що немає замовлень.");
+                            countRs.close();
+                            countStmt.close();
+                            return;
                         }
+                        countRs.close();
+                        countStmt.close();
 
-                        // Зберігаємо, що адмін зараз дивиться перше замовлення
                         adminOrderIndex.put(userId, 0);
-
-                        // Показуємо перше замовлення з бази
                         showAdminOrder(userId, chatId);
 
                     } catch (SQLException e) {
@@ -542,35 +544,37 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 case "✅ Підтвердити" -> {
-                    try (Connection conn = DatabaseManager.getConnection()) {
-                        // Витягаємо перше нове замовлення
+                    try {
+                        Connection conn = DatabaseManager.getConnection();
+
                         String selectSql = "SELECT * FROM orders WHERE status = 'Нове' ORDER BY id ASC LIMIT 1";
-                        try (PreparedStatement stmt = conn.prepareStatement(selectSql);
-                             ResultSet rs = stmt.executeQuery()) {
+                        PreparedStatement stmt = conn.prepareStatement(selectSql);
+                        ResultSet rs = stmt.executeQuery();
 
-                            if (!rs.next()) {
-                                sendText(chatId, "Замовлень немає.");
-                                break;
-                            }
-
-                            Long orderId = rs.getLong("id");
-                            String orderCode = rs.getString("orderCode");
-                            Long orderUserId = rs.getLong("userId");
-
-                            sendText(orderUserId.toString(), "✅ Ваше замовлення підтверджено! Очікуйте доставку.");
-
-                            String updateSql = "UPDATE orders SET status = 'Підтверджено' WHERE id = ?";
-                            try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
-                                updateStmt.setLong(1, orderId);
-                                updateStmt.executeUpdate();
-                            }
-
-                            sendText(chatId, "Замовлення підтверджено ✅");
-
-                            // Показуємо адміну наступне замовлення
-                            Long adminId = userId;
-                            showAdminOrder(adminId, chatId);
+                        if (!rs.next()) {
+                            sendText(chatId, "Замовлень немає.");
+                            rs.close();
+                            stmt.close();
+                            break;
                         }
+
+                        Long orderId = rs.getLong("id");
+                        String orderCode = rs.getString("orderCode");
+                        Long orderUserId = rs.getLong("userId");
+                        rs.close();
+                        stmt.close();
+
+                        sendText(orderUserId.toString(), "✅ Ваше замовлення підтверджено! Очікуйте доставку.");
+
+                        String updateSql = "UPDATE orders SET status = 'Підтверджено' WHERE id = ?";
+                        PreparedStatement updateStmt = conn.prepareStatement(updateSql);
+                        updateStmt.setLong(1, orderId);
+                        updateStmt.executeUpdate();
+                        updateStmt.close();
+
+                        sendText(chatId, "Замовлення підтверджено ✅");
+                        showAdminOrder(userId, chatId);
+
                     } catch (SQLException e) {
                         e.printStackTrace();
                         sendText(chatId, "❌ Помилка при підтвердженні замовлення.");
@@ -583,40 +587,39 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 case "🗑️ Видалити замовлення" -> {
-                    try (Connection conn = DatabaseManager.getConnection()) {
-                        // Беремо перше активне замовлення
+                    try {
+                        Connection conn = DatabaseManager.getConnection();
+
                         String selectSql = "SELECT * FROM orders WHERE status NOT IN ('Видалено', 'Підтверджено', 'Відхилено') ORDER BY id ASC LIMIT 1";
-                        try (PreparedStatement stmt = conn.prepareStatement(selectSql);
-                             ResultSet rs = stmt.executeQuery()) {
+                        PreparedStatement stmt = conn.prepareStatement(selectSql);
+                        ResultSet rs = stmt.executeQuery();
 
-                            if (!rs.isBeforeFirst()) {
-                                sendText(chatId, "Замовлень немає.");
-                                break;
-                            }
-
-                            if (rs.next()) {
-                                String orderCode = rs.getString("orderCode");
-                                Long orderUserId = rs.getLong("userId");
-
-                                // Оновлюємо статус на "Видалено"
-                                String updateSql = "UPDATE orders SET status = ?, comment = ? WHERE orderCode = ?";
-                                try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
-                                    updateStmt.setString(1, "Видалено");
-                                    updateStmt.setString(2, "Видалено адміністратором");
-                                    updateStmt.setString(3, orderCode);
-                                    updateStmt.executeUpdate();
-                                }
-
-                                // Повідомляємо користувачу
-                                sendText(orderUserId.toString(), "🗑️ Ваше замовлення було видалено адміністратором.");
-
-                                // Повідомляємо адміну
-                                sendText(chatId, "🗑️ Замовлення видалено.");
-
-                                // Показуємо наступне активне замовлення
-                                showAdminOrder(userId, chatId);
-                            }
+                        if (!rs.isBeforeFirst()) {
+                            sendText(chatId, "Замовлень немає.");
+                            rs.close();
+                            stmt.close();
+                            break;
                         }
+
+                        if (rs.next()) {
+                            String orderCode = rs.getString("orderCode");
+                            Long orderUserId = rs.getLong("userId");
+                            rs.close();
+                            stmt.close();
+
+                            String updateSql = "UPDATE orders SET status = ?, comment = ? WHERE orderCode = ?";
+                            PreparedStatement updateStmt = conn.prepareStatement(updateSql);
+                            updateStmt.setString(1, "Видалено");
+                            updateStmt.setString(2, "Видалено адміністратором");
+                            updateStmt.setString(3, orderCode);
+                            updateStmt.executeUpdate();
+                            updateStmt.close();
+
+                            sendText(orderUserId.toString(), "🗑️ Ваше замовлення було видалено адміністратором.");
+                            sendText(chatId, "🗑️ Замовлення видалено.");
+                            showAdminOrder(userId, chatId);
+                        }
+
                     } catch (SQLException e) {
                         e.printStackTrace();
                         sendText(chatId, "❌ Помилка при видаленні замовлення.");
@@ -997,48 +1000,49 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
             }
 
-            // ← Додаємо обробку стану відхилення замовлення
             case "reject_order_reason" -> {
-                String reason = text; // текст, який ввів адміністратор
+                String reason = text;
 
-                try (Connection conn = DatabaseManager.getConnection()) {
-                    // Беремо перше замовлення з бази
+                try {
+                    Connection conn = DatabaseManager.getConnection();
+
                     String sql = "SELECT * FROM orders WHERE status != 'Підтверджено' AND status != 'Відхилено' ORDER BY id ASC LIMIT 1";
-                    try (PreparedStatement stmt = conn.prepareStatement(sql);
-                         ResultSet rs = stmt.executeQuery()) {
+                    PreparedStatement stmt = conn.prepareStatement(sql);
+                    ResultSet rs = stmt.executeQuery();
 
-                        if (!rs.isBeforeFirst()) {
-                            sendText(chatId, "Замовлень немає.");
-                            userStates.remove(userId);
-                            break;
-                        }
-
-                        if (rs.next()) {
-                            Long orderUserId = rs.getLong("userId");
-                            String orderCode = rs.getString("orderCode");
-
-                            // Відправляємо користувачу повідомлення про відхилення
-                            sendText(orderUserId.toString(), "❌ Ваше замовлення відхилено.\nПричина: " + reason);
-
-                            // Оновлюємо статус і коментар у базі
-                            String updateSql = "UPDATE orders SET status = ?, comment = ? WHERE orderCode = ?";
-                            try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
-                                updateStmt.setString(1, "Відхилено");
-                                updateStmt.setString(2, reason);
-                                updateStmt.setString(3, orderCode);
-                                int rows = updateStmt.executeUpdate();
-                                if (rows == 0) {
-                                    sendText(chatId, "❌ Не вдалося оновити замовлення у базі.");
-                                }
-                            }
-
-                            // Повідомляємо адміну
-                            sendText(chatId, "Замовлення відхилено ✅");
-
-                            // Показуємо наступне замовлення адміну
-                            showAdminOrder(userId, chatId);
-                        }
+                    if (!rs.isBeforeFirst()) {
+                        sendText(chatId, "Замовлень немає.");
+                        userStates.remove(userId);
+                        rs.close();
+                        stmt.close();
+                        break;
                     }
+
+                    if (rs.next()) {
+                        Long orderUserId = rs.getLong("userId");
+                        String orderCode = rs.getString("orderCode");
+                        rs.close();
+                        stmt.close();
+
+                        sendText(orderUserId.toString(), "❌ Ваше замовлення відхилено.\nПричина: " + reason);
+
+                        String updateSql = "UPDATE orders SET status = ?, comment = ? WHERE orderCode = ?";
+                        PreparedStatement updateStmt = conn.prepareStatement(updateSql);
+                        updateStmt.setString(1, "Відхилено");
+                        updateStmt.setString(2, reason);
+                        updateStmt.setString(3, orderCode);
+                        int rows = updateStmt.executeUpdate();
+                        updateStmt.close();
+
+                        if (rows == 0) {
+                            sendText(chatId, "❌ Не вдалося оновити замовлення у базі.");
+                        } else {
+                            sendText(chatId, "Замовлення відхилено ✅");
+                        }
+
+                        showAdminOrder(userId, chatId);
+                    }
+
                 } catch (SQLException e) {
                     e.printStackTrace();
                     sendText(chatId, "❌ Помилка при обробці замовлення.");
@@ -1326,22 +1330,24 @@ public class StoreBot extends TelegramLongPollingBot {
                     total += price;
                 }
 
-                try (Connection conn = DatabaseManager.getConnection()) {
-                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, city, fullName, phone, card, status, item, total, date) " +
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                        stmt.setString(1, orderCode);
-                        stmt.setLong(2, userId);
-                        stmt.setString(3, "Самовивіз");
-                        stmt.setString(4, city);
-                        stmt.setString(5, fullName);
-                        stmt.setString(6, phone);
-                        stmt.setString(7, card);
-                        stmt.setString(8, "Нове");
-                        stmt.setString(9, itemsDb.toString());
-                        stmt.setDouble(10, total);
-                        stmt.executeUpdate();
-                    }
+                try {
+                    Connection conn = DatabaseManager.getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(
+                            "INSERT INTO orders (orderCode, userId, deliveryType, city, fullName, phone, card, status, item, total, date) " +
+                                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+                    );
+                    stmt.setString(1, orderCode);
+                    stmt.setLong(2, userId);
+                    stmt.setString(3, "Самовивіз");
+                    stmt.setString(4, city);
+                    stmt.setString(5, fullName);
+                    stmt.setString(6, phone);
+                    stmt.setString(7, card);
+                    stmt.setString(8, "Нове");
+                    stmt.setString(9, itemsDb.toString());
+                    stmt.setDouble(10, total);
+                    stmt.executeUpdate();
+                    stmt.close();
 
                     userCart.remove(userId);
                     userStates.remove(userId);
@@ -1350,10 +1356,8 @@ public class StoreBot extends TelegramLongPollingBot {
                             "\nВаше замовлення:\n" + itemsDb.toString().replace(";", "\n") +
                             "\n💰 Всього: " + total + " грн\nБудь ласка, заберіть товар у магазині.");
 
-                    // Надсилаємо адміну
-                    for (Long adminId : ADMINS) {
-                        showAdminOrder(adminId, adminId.toString());
-                    }
+                    for (Long adminId : ADMINS) showAdminOrder(adminId, adminId.toString());
+
                 } catch (SQLException e) {
                     e.printStackTrace();
                     sendText(chatId, "❌ Сталася помилка при збереженні замовлення.");
@@ -1389,22 +1393,24 @@ public class StoreBot extends TelegramLongPollingBot {
                     total += price;
                 }
 
-                try (Connection conn = DatabaseManager.getConnection()) {
-                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, address, fullName, phone, card, status, item, total, date) " +
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                        stmt.setString(1, orderCode);
-                        stmt.setLong(2, userId);
-                        stmt.setString(3, "Доставка по місту");
-                        stmt.setString(4, address);
-                        stmt.setString(5, fullName);
-                        stmt.setString(6, phone);
-                        stmt.setString(7, card);
-                        stmt.setString(8, "Нове");
-                        stmt.setString(9, itemsDb.toString());
-                        stmt.setDouble(10, total);
-                        stmt.executeUpdate();
-                    }
+                try {
+                    Connection conn = DatabaseManager.getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(
+                            "INSERT INTO orders (orderCode, userId, deliveryType, address, fullName, phone, card, status, item, total, date) " +
+                                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+                    );
+                    stmt.setString(1, orderCode);
+                    stmt.setLong(2, userId);
+                    stmt.setString(3, "Доставка по місту");
+                    stmt.setString(4, address);
+                    stmt.setString(5, fullName);
+                    stmt.setString(6, phone);
+                    stmt.setString(7, card);
+                    stmt.setString(8, "Нове");
+                    stmt.setString(9, itemsDb.toString());
+                    stmt.setDouble(10, total);
+                    stmt.executeUpdate();
+                    stmt.close();
 
                     userCart.remove(userId);
                     userStates.remove(userId);
@@ -1413,10 +1419,8 @@ public class StoreBot extends TelegramLongPollingBot {
                             "\nВаше замовлення:\n" + itemsDb.toString().replace(";", "\n") +
                             "\n💰 Всього: " + total + " грн\nВаш товар буде доставлений за вказаною адресою.");
 
-                    // Надсилаємо адміну
-                    for (Long adminId : ADMINS) {
-                        showAdminOrder(adminId, adminId.toString());
-                    }
+                    for (Long adminId : ADMINS) showAdminOrder(adminId, adminId.toString());
+
                 } catch (SQLException e) {
                     e.printStackTrace();
                     sendText(chatId, "❌ Сталася помилка при збереженні замовлення.");
@@ -1452,22 +1456,24 @@ public class StoreBot extends TelegramLongPollingBot {
                     total += price;
                 }
 
-                try (Connection conn = DatabaseManager.getConnection()) {
-                    String sql = "INSERT INTO orders (orderCode, userId, deliveryType, postOffice, fullName, phone, card, status, item, total, date) " +
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                        stmt.setString(1, orderCode);
-                        stmt.setLong(2, userId);
-                        stmt.setString(3, "Нова пошта");
-                        stmt.setString(4, postOffice);
-                        stmt.setString(5, fullName);
-                        stmt.setString(6, phone);
-                        stmt.setString(7, card);
-                        stmt.setString(8, "Нове");
-                        stmt.setString(9, itemsDb.toString());
-                        stmt.setDouble(10, total);
-                        stmt.executeUpdate();
-                    }
+                try {
+                    Connection conn = DatabaseManager.getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(
+                            "INSERT INTO orders (orderCode, userId, deliveryType, postOffice, fullName, phone, card, status, item, total, date) " +
+                                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+                    );
+                    stmt.setString(1, orderCode);
+                    stmt.setLong(2, userId);
+                    stmt.setString(3, "Нова пошта");
+                    stmt.setString(4, postOffice);
+                    stmt.setString(5, fullName);
+                    stmt.setString(6, phone);
+                    stmt.setString(7, card);
+                    stmt.setString(8, "Нове");
+                    stmt.setString(9, itemsDb.toString());
+                    stmt.setDouble(10, total);
+                    stmt.executeUpdate();
+                    stmt.close();
 
                     userCart.remove(userId);
                     userStates.remove(userId);
@@ -1477,10 +1483,8 @@ public class StoreBot extends TelegramLongPollingBot {
                             "\nВаше замовлення:\n" + itemsDb.toString().replace(";", "\n") +
                             "\n💰 Всього: " + total + " грн\nВаш товар буде доставлений Новою поштою за вказаним відділенням.");
 
-                    // Надсилаємо адміну
-                    for (Long adminId : ADMINS) {
-                        showAdminOrder(adminId, adminId.toString());
-                    }
+                    for (Long adminId : ADMINS) showAdminOrder(adminId, adminId.toString());
+
                 } catch (SQLException e) {
                     e.printStackTrace();
                     sendText(chatId, "❌ Сталася помилка при збереженні замовлення.");
@@ -1504,29 +1508,30 @@ public class StoreBot extends TelegramLongPollingBot {
                     case "📄 Показати всі запрошення" -> {
                         String sql = "SELECT * FROM invites ORDER BY id ASC";
 
-                        try (Connection conn = DatabaseManager.getConnection();
-                             PreparedStatement stmt = conn.prepareStatement(sql);
-                             ResultSet rs = stmt.executeQuery()) {
+                        try {
+                            Connection conn = DatabaseManager.getConnection();
+                            try (PreparedStatement stmt = conn.prepareStatement(sql);
+                                 ResultSet rs = stmt.executeQuery()) {
 
-                            StringBuilder sb = new StringBuilder("🔗 Статистика запрошень:\n\n");
-                            boolean hasInvites = false;
+                                StringBuilder sb = new StringBuilder("🔗 Статистика запрошень:\n\n");
+                                boolean hasInvites = false;
 
-                            while (rs.next()) {
-                                hasInvites = true;
-                                sb.append("🆔 ID: ").append(rs.getInt("id")).append("\n")
-                                        .append("👤 Ім'я: ").append(rs.getString("name")).append("\n")
-                                        .append("💰 Каса: ").append(rs.getString("kasa")).append("\n")
-                                        .append("🏙️ Місто: ").append(rs.getString("city")).append("\n")
-                                        .append("📈 Кількість приєднались: ").append(rs.getInt("number")).append("\n")
-                                        .append("-----------------------------\n");
+                                while (rs.next()) {
+                                    hasInvites = true;
+                                    sb.append("🆔 ID: ").append(rs.getInt("id")).append("\n")
+                                            .append("👤 Ім'я: ").append(rs.getString("name")).append("\n")
+                                            .append("💰 Каса: ").append(rs.getString("kasa")).append("\n")
+                                            .append("🏙️ Місто: ").append(rs.getString("city")).append("\n")
+                                            .append("📈 Кількість приєднались: ").append(rs.getInt("number")).append("\n")
+                                            .append("-----------------------------\n");
+                                }
+
+                                if (!hasInvites) {
+                                    sendText(chatId, "Поки що немає запрошень.");
+                                } else {
+                                    sendText(chatId, sb.toString());
+                                }
                             }
-
-                            if (!hasInvites) {
-                                sendText(chatId, "Поки що немає запрошень.");
-                            } else {
-                                sendText(chatId, sb.toString());
-                            }
-
                         } catch (SQLException e) {
                             e.printStackTrace();
                             sendText(chatId, "❌ Сталася помилка при отриманні запрошень.");
@@ -2030,77 +2035,6 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
-    private void handleDeveloperText(Long userId, String chatId, String text, String botUsername) {
-        switch (text) {
-            case "🔗 Запрошувальні посилання" -> sendMessage(createInvitesMenu(chatId));
-            case "📜 Логирування" -> sendText(chatId, "📜 Тут буде логування..."); // пізніше можна додати статистику
-            case "📝 Список онови" -> {
-                List<String> changelog = DeveloperFileManager.getChangelog(); // List<String>
-                if (changelog.isEmpty()) {
-                    sendText(chatId, "📝 Поки що немає оновлень.");
-                } else {
-                    StringBuilder sb = new StringBuilder("📝 Список онови:\n");
-                    for (String entry : changelog) {
-                        sb.append("• ").append(entry).append("\n");
-                    }
-                    sendText(chatId, sb.toString());
-                }
-            }
-            case "⬅️ Назад в головне меню" -> sendMessage(createUserMenu(chatId, userId));
-        }
-    }
-
-    private void handleInvitesText(Long userId, String chatId, String text, String botUsername) {
-        switch (text) {
-            case "➕ Додати запрошення" -> {
-                // Можна тут попросити ввести Name, Kasa, City через userStates
-                userStates.put(userId, "awaiting_new_invite");
-                sendText(chatId, "✏️ Введіть дані нового запрошення у форматі:\nName,Kasa,City");
-            }
-            case "✏️ Редагувати запрошення" -> {
-                userStates.put(userId, "awaiting_edit_invite");
-                sendText(chatId, "✏️ Введіть ID запрошення, яке хочете редагувати:");
-            }
-            case "🗑️ Видалити запрошення" -> {
-                userStates.put(userId, "awaiting_delete_invite");
-                sendText(chatId, "✏️ Введіть ID запрошення, яке хочете видалити:");
-            }
-            case "📄 Показати всі запрошення" -> {
-                String sql = "SELECT * FROM invites ORDER BY id ASC";
-
-                try (Connection conn = DatabaseManager.getConnection();
-                     PreparedStatement stmt = conn.prepareStatement(sql);
-                     ResultSet rs = stmt.executeQuery()) {
-
-                    StringBuilder sb = new StringBuilder("🔗 Список запрошень:\n");
-                    boolean hasInvites = false;
-
-                    while (rs.next()) {
-                        hasInvites = true;
-                        sb.append("ID: ").append(rs.getInt("id"))
-                                .append(", Name: ").append(rs.getString("name"))
-                                .append(", Kasa: ").append(rs.getString("kasa"))
-                                .append(", City: ").append(rs.getString("city"))
-                                .append(", Invite: ").append(rs.getString("invite"))
-                                .append(", Number: ").append(rs.getInt("number"))
-                                .append("\n");
-                    }
-
-                    if (!hasInvites) {
-                        sendText(chatId, "Поки що немає запрошень.");
-                    } else {
-                        sendText(chatId, sb.toString());
-                    }
-
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                    sendText(chatId, "❌ Сталася помилка при отриманні запрошень.");
-                }
-            }
-            case "⬅️ Назад в розробника" -> sendMessage(createDeveloperMenu(chatId));
-        }
-    }
-
     private void handleDeleteCategorySelect(Long userId, String chatId, String categoryName) {
         if (categoryName == null || categoryName.isBlank()) {
             sendText(chatId, "❌ Помилка: назва категорії не може бути порожньою.");
@@ -2534,30 +2468,34 @@ public class StoreBot extends TelegramLongPollingBot {
 
     // --- Показ підкатегорій ---
     private void sendSubcategories(Long chatId, String categoryName) {
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                     "SELECT s.name FROM subcategories s " +
-                             "JOIN categories c ON s.category_id = c.id " +
-                             "WHERE c.name = ? ORDER BY s.id")) {
+        try {
+            Connection conn = DatabaseManager.getConnection(); // одне постійне підключення
 
-            stmt.setString(1, categoryName);
-            ResultSet rs = stmt.executeQuery();
-            List<String> subcategories = new ArrayList<>();
-            while (rs.next()) {
-                subcategories.add(rs.getString("name"));
+            try (PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT s.name FROM subcategories s " +
+                            "JOIN categories c ON s.category_id = c.id " +
+                            "WHERE c.name = ? ORDER BY s.id")) {
+
+                stmt.setString(1, categoryName);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    List<String> subcategories = new ArrayList<>();
+                    while (rs.next()) {
+                        subcategories.add(rs.getString("name"));
+                    }
+
+                    if (subcategories.isEmpty()) {
+                        sendText(chatId, "❌ У цій категорії немає підкатегорій.");
+                        return;
+                    }
+
+                    ReplyKeyboardMarkup markup = ReplyKeyboardMarkup.builder()
+                            .resizeKeyboard(true)
+                            .keyboard(buildKeyboard(subcategories, true))
+                            .build();
+
+                    sendMessage(chatId, "📁 Виберіть підкатегорію:", markup);
+                }
             }
-
-            if (subcategories.isEmpty()) {
-                sendText(chatId, "❌ У цій категорії немає підкатегорій.");
-                return;
-            }
-
-            ReplyKeyboardMarkup markup = ReplyKeyboardMarkup.builder()
-                    .resizeKeyboard(true)
-                    .keyboard(buildKeyboard(subcategories, true))
-                    .build();
-
-            sendMessage(chatId, "📁 Виберіть підкатегорію:", markup);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -2853,11 +2791,14 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
     private void showAdminOrder(Long adminId, String chatId) {
-        try (Connection conn = DatabaseManager.getConnection()) {
+        try {
+            // Беремо постійне підключення
+            Connection conn = DatabaseManager.getConnection();
 
             // Беремо всі активні замовлення
             String sql = "SELECT * FROM orders WHERE status != 'Видалено' ORDER BY id ASC";
             List<Map<String, Object>> orders = new ArrayList<>();
+
             try (PreparedStatement stmt = conn.prepareStatement(sql);
                  ResultSet rs = stmt.executeQuery()) {
 
@@ -2879,7 +2820,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
                     Object totalObj = rs.getObject("total");
                     double total = 0;
-                    if (totalObj instanceof Number) total = ((Number) totalObj).doubleValue();
+                    if (totalObj instanceof Number n) total = n.doubleValue();
                     else if (totalObj != null) {
                         try { total = Double.parseDouble(totalObj.toString()); } catch (Exception ignored) {}
                     }
@@ -2900,7 +2841,8 @@ public class StoreBot extends TelegramLongPollingBot {
             Map<String, Object> orderToShow = orders.get(idx);
 
             // Показуємо адміну
-            createOrderAdminMenu(chatId, orderToShow, orderToShow.get("userId") instanceof Long ? (Long) orderToShow.get("userId") : 0L);
+            createOrderAdminMenu(chatId, orderToShow,
+                    orderToShow.get("userId") instanceof Long ? (Long) orderToShow.get("userId") : 0L);
 
         } catch (SQLException e) {
             e.printStackTrace();
