@@ -50,13 +50,13 @@ public class StoreBot extends TelegramLongPollingBot {
 
     private final Map<Long, String> adminEditingProduct = new HashMap<>();
     private final Map<Long, String> adminEditingField = new HashMap<>();
-    private final Map<Long, List<String>> adminMatchList = new HashMap<>();
+    private final Map<Long, List<Map<String, Object>>> adminMatchList = new HashMap<>();
     private final Map<Long, String> adminNewCategory = new HashMap<>();
     private final List<String> hitItems = new ArrayList<>();
     private final Map<Long, List<String>> supportAnswers = new HashMap<>();
     private final Map<Long, Integer> adminOrderIndex = new HashMap<>();
-    private final Map<Long, String> adminSearchKeyword = new HashMap<>();
-    private Map<Long, String> adminSearchSource = new HashMap<>();
+    private final Map<Long, String> adminSearchSource = new HashMap<>();  // джерело пошуку для кожного користувача
+    private final Map<Long, String> adminSearchKeyword = new HashMap<>(); // ключове слово для пошуку
     private Map<Long, List<Map<String, Object>>> adminSearchResults = new HashMap<>();
     private final Map<String, Object> tempStorage = new HashMap<>();
 
@@ -1797,7 +1797,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
     // Вибір товару по списку
     private void handleChooseProduct(Long userId, String chatId, String text) {
-        List<String> matches = adminMatchList.get(userId); // список назв товарів
+        List<Map<String, Object>> matches = adminMatchList.get(userId); // список товарів
         if (matches == null || matches.isEmpty()) {
             sendText(chatId, "❌ Помилка: список товарів порожній.");
             userStates.remove(userId);
@@ -1811,8 +1811,9 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            String selectedProductName = matches.get(index);
-            adminEditingProduct.put(userId, selectedProductName);
+            Map<String, Object> selectedProduct = matches.get(index);
+            String selectedProductName = (String) selectedProduct.get("name");
+            adminEditingProduct.put(userId, selectedProductName); // зберігаємо тільки назву
 
             userStates.put(userId, "editing");
             adminMatchList.remove(userId);
@@ -2799,9 +2800,14 @@ public class StoreBot extends TelegramLongPollingBot {
         String source = adminSearchSource.getOrDefault(userId, "mysql");
 
         if ("mysql".equals(source)) {
-            results = searcher.searchByKeywordsAdmin(text); // MySQL + YAML інтегровано тут
+            results = searcher.searchByKeywordsAdmin(text); // твій метод для MySQL
         } else if ("yaml".equals(source)) {
-            results = CatalogUpdater.searchProductsSimple(text); // новий метод для простого YAML
+            try {
+                results = CatalogUpdater.searchProductsSimple(text); // твій метод для YAML
+            } catch (Exception e) {
+                sendText(chatId, "❌ Помилка при пошуку у YAML: " + e.getMessage());
+                return;
+            }
         }
 
         if (results.isEmpty()) {
@@ -2809,20 +2815,20 @@ public class StoreBot extends TelegramLongPollingBot {
             return;
         }
 
-        // Зберігаємо результати для користувача
-        adminSearchResults.put(userId, results);
-        userStates.put(userId, "choose_product");
+        // --- Зберігаємо результати для вибору
+        adminMatchList.put(userId, results);
 
-        // Відправляємо нумерований список
-        StringBuilder sb = new StringBuilder("🔎 Знайдено товари:\n\n");
+        // --- Формуємо список для відправки адміну
+        StringBuilder sb = new StringBuilder("🔎 Знайдено товари. Введіть номер для редагування:\n\n");
         for (int i = 0; i < results.size(); i++) {
-            sb.append(i + 1).append(". ").append(results.get(i).get("name"));
-            if (results.get(i).containsKey("price")) {
-                sb.append(" | Ціна: ").append(results.get(i).get("price"));
-            }
+            Map<String, Object> prod = results.get(i);
+            sb.append(i + 1).append(". ").append(prod.get("name"));
+            if (prod.get("price") != null) sb.append(" | Ціна: ").append(prod.get("price"));
             sb.append("\n");
         }
+
         sendText(chatId, sb.toString());
+        userStates.put(userId, "choose_product");
     }
 
     // Головний метод створення меню відгуку
