@@ -17,7 +17,6 @@ import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 
 import java.io.InputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.net.URL;
 import java.util.*;
 import java.util.List;
@@ -46,7 +45,7 @@ public class StoreBot extends TelegramLongPollingBot {
     private final List<Long> DEVELOPERS = List.of(620298889L, 1030917576L, 533570832L); // тут айді розробників меню
 
     // 🔹 Адмінські стани
-    private Map<Long, Long> adminReplyTarget = new HashMap<>();
+    private final Map<Long, Long> adminReplyTarget = new HashMap<>();
 
     private final Map<Long, String> adminEditingProduct = new HashMap<>();
     private final Map<Long, String> adminEditingField = new HashMap<>();
@@ -57,7 +56,6 @@ public class StoreBot extends TelegramLongPollingBot {
     private final Map<Long, Integer> adminOrderIndex = new HashMap<>();
     private final Map<Long, String> adminSearchSource = new HashMap<>();  // джерело пошуку для кожного користувача
     private final Map<Long, String> adminSearchKeyword = new HashMap<>(); // ключове слово для пошуку
-    private Map<Long, List<Map<String, Object>>> adminSearchResults = new HashMap<>();
     private final Map<String, Object> tempStorage = new HashMap<>();
 
     private final CatalogSearcher catalogSearcher = new CatalogSearcher();
