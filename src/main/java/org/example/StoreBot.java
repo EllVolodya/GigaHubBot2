@@ -1783,10 +1783,12 @@ public class StoreBot extends TelegramLongPollingBot {
 
     // ✏️ Початок редагування товару для адміна
     private void handleEditProductStart(Long userId, String chatId, String text) throws TelegramApiException {
+        // Зберігаємо ключові слова
         adminSearchKeyword.put(userId, text);
+        userStates.put(userId, "awaiting_search");
 
-        // Відправляємо меню для вибору джерела пошуку
-        sendMessage(showAdminSearchSourceMenu(userId, Long.valueOf(chatId)));
+        // Відразу викликаємо пошук
+        handleAdminSearchInput(userId, chatId, text);
     }
 
     // Вибір товару по списку
@@ -2786,27 +2788,23 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
-    private void handleAdminSearchInput(Long userId, String chatId, String text) throws TelegramApiException {
+    private void handleAdminSearchInput(Long userId, String chatId, String keywords) throws TelegramApiException {
         List<Map<String, Object>> results = new ArrayList<>();
         CatalogSearcher searcher = new CatalogSearcher();
-        String source = adminSearchSource.getOrDefault(userId, "mysql");
 
-        String keywords = text; // 🔹 використовуємо текст повідомлення як ключові слова
+        // --- Пошук у MySQL ---
+        results.addAll(searcher.searchByKeywordsAdmin(keywords));
 
-        if ("mysql".equals(source)) {
-            results = searcher.searchByKeywordsAdmin(keywords);
-        } else if ("yaml".equals(source)) {
-            try {
-                results = CatalogUpdater.searchProductsByKeywords(keywords);
-            } catch (java.io.IOException e) {
-                sendText(chatId, "❌ Помилка при пошуку у YAML: " + e.getMessage());
-                return;
-            }
+        // --- Пошук у YAML ---
+        try {
+            results.addAll(CatalogUpdater.searchProductsByKeywords(keywords));
+        } catch (IOException e) {
+            sendText(chatId, "❌ Помилка при пошуку у YAML: " + e.getMessage());
         }
 
         // Відправка результатів адміну
         if (results.isEmpty()) {
-            sendText(chatId, "❌ Товар не знайдено: " + keywords);
+            sendText(chatId, "❌ Товар не знайдено за ключовими словами: " + keywords);
         } else {
             StringBuilder sb = new StringBuilder("🔎 Знайдено товари:\n\n");
             for (int i = 0; i < results.size(); i++) {
