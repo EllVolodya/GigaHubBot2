@@ -17,9 +17,11 @@ import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 
 import java.io.InputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.URL;
 import java.util.*;
 import java.util.List;
+import java.util.Map;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -53,6 +55,8 @@ public class StoreBot extends TelegramLongPollingBot {
     private final List<String> hitItems = new ArrayList<>();
     private final Map<Long, List<String>> supportAnswers = new HashMap<>();
     private final Map<Long, Integer> adminOrderIndex = new HashMap<>();
+    private final Map<Long, String> adminSearchKeyword = new HashMap<>();
+    private Map<Long, String> adminSearchSource = new HashMap<>();
     private final Map<String, Object> tempStorage = new HashMap<>();
 
     private final CatalogSearcher catalogSearcher = new CatalogSearcher();
@@ -467,6 +471,44 @@ public class StoreBot extends TelegramLongPollingBot {
                         sendText(chatId, "✏️ Введіть назву товару, який хочете редагувати:");
                     } else sendText(chatId, "⛔ У вас немає прав.");
                 }
+
+                case "🔹 MySQL" -> {
+                    String keyword = adminSearchKeyword.get(userId);
+                    CatalogSearcher catalogSearcher = new CatalogSearcher();
+                    List<Map<String, Object>> results = catalogSearcher.searchByKeywordsAdmin(keyword);
+
+                    if (results.isEmpty()) {
+                        sendText(chatId, "❌ Товар не знайдено: " + keyword);
+                    } else {
+                        StringBuilder sb = new StringBuilder("🔎 Знайдено товари у MySQL:\n\n");
+                        for (int i = 0; i < results.size(); i++) {
+                            sb.append(i + 1).append(". ").append(results.get(i).get("name")).append("\n");
+                        }
+                        sendText(chatId, sb.toString());
+                    }
+                }
+
+                case "🔹 YAML" -> {
+                    String keyword = adminSearchKeyword.get(userId);
+                    List<Map<String, Object>> results;
+                    try {
+                        results = CatalogUpdater.searchProductsByKeywords(keyword);
+                    } catch (java.io.IOException e) {
+                        sendText(chatId, "❌ Помилка при пошуку у YAML: " + e.getMessage());
+                        break;
+                    }
+
+                    if (results.isEmpty()) {
+                        sendText(chatId, "❌ Товар не знайдено: " + keyword);
+                    } else {
+                        StringBuilder sb = new StringBuilder("🔎 Знайдено товари у YAML:\n\n");
+                        for (int i = 0; i < results.size(); i++) {
+                            sb.append(i + 1).append(". ").append(results.get(i).get("name")).append("\n");
+                        }
+                        sendText(chatId, sb.toString());
+                    }
+                }
+
                 case "Редагувати категорії" -> {
                     if (ADMINS.contains(userId)) {
                         userStates.put(userId, "category_management");
@@ -911,8 +953,9 @@ public class StoreBot extends TelegramLongPollingBot {
 
     private void handleState(Long userId, String chatId, String text, String state, Update update) {
 
-        switch (state) {
+        Long chatIdLong = Long.parseLong(chatId);
 
+        switch (state) {
             case "search_catalog" -> handleSearch(userId, chatId, text);
             case "edit_product" -> {
                 try {
@@ -935,6 +978,22 @@ public class StoreBot extends TelegramLongPollingBot {
             case "category_management" -> handleCategoryManagementState(userId, chatId, text);
             case "waiting_for_search" -> handleWaitingForSearch(userId, chatId, text);
             case "waiting_for_product_number" -> handleWaitingForProductNumber(userId, chatId, text);
+            case "choose_search_source" -> {
+                try {
+                    handleAdminSearchSource(userId, chatId, text);
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                    sendText(Long.valueOf(chatId), "❌ Помилка при виборі джерела пошуку.");
+                }
+            }
+            case "awaiting_search" -> {
+                try {
+                    handleAdminSearchInput(userId, chatId, text);
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                    sendText(Long.valueOf(chatId), "❌ Помилка при пошуку товару.");
+                }
+            }
 
             // ← Додаємо обробку стану відхилення замовлення
             case "reject_order_reason" -> {
@@ -1724,39 +1783,10 @@ public class StoreBot extends TelegramLongPollingBot {
 
     // ✏️ Початок редагування товару для адміна
     private void handleEditProductStart(Long userId, String chatId, String text) throws TelegramApiException {
-        // 1️⃣ Шукаємо товар у MySQL + catalog.yml
-        List<Map<String, Object>> matchesMap = catalogSearcher.searchByKeywordsAdmin(text);
+        adminSearchKeyword.put(userId, text);
 
-        // 2️⃣ Формуємо список назв для відображення
-        List<String> matches = new ArrayList<>();
-        for (Map<String, Object> p : matchesMap) {
-            matches.add(String.valueOf(p.get("name")));
-        }
-
-        // 3️⃣ Якщо нічого не знайдено
-        if (matches.isEmpty()) {
-            sendText(chatId, "❌ Товар не знайдено: " + text);
-            return;
-        }
-
-        // 4️⃣ Якщо знайдено один товар
-        if (matches.size() == 1) {
-            adminEditingProduct.put(userId, matches.get(0));
-            userStates.put(userId, "editing");
-            sendMessage(createEditMenu(chatId, matches.get(0)));
-            return;
-        }
-
-        // 5️⃣ Якщо знайдено кілька товарів — показуємо нумерований список
-        adminMatchList.put(userId, matches);
-        userStates.put(userId, "choose_product");
-
-        StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів. Введіть номер:\n\n");
-        for (int i = 0; i < matches.size(); i++) {
-            sb.append(i + 1).append(". ").append(matches.get(i)).append("\n");
-        }
-
-        sendText(chatId, sb.toString());
+        // Відправляємо меню для вибору джерела пошуку
+        sendMessage(showAdminSearchSourceMenu(userId, Long.valueOf(chatId)));
     }
 
     // Вибір товару по списку
@@ -2718,6 +2748,72 @@ public class StoreBot extends TelegramLongPollingBot {
 
         markup.setKeyboard(keyboard);
         return markup;
+    }
+
+    // Метод створення меню для вибору джерела пошуку
+    private SendMessage showAdminSearchSourceMenu(Long userId, Long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText("🔹 Виберіть джерело пошуку:");
+
+        // Створюємо клавіатуру
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add("🔍 Пошук у MySQL");
+        row1.add("🔍 Пошук у YAML");
+
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        keyboard.add(row1);
+
+        ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
+        markup.setKeyboard(keyboard);
+        markup.setResizeKeyboard(true);
+
+        message.setReplyMarkup(markup);
+        return message; // повертаємо SendMessage
+    }
+
+    private void handleAdminSearchSource(Long userId, String chatId, String text) throws TelegramApiException {
+        if ("🔍 Пошук у MySQL".equals(text)) {
+            adminSearchSource.put(userId, "mysql");
+            userStates.put(userId, "awaiting_search");
+            sendText(chatId, "Введіть ключові слова для пошуку у MySQL:");
+        } else if ("🔍 Пошук у YAML".equals(text)) {
+            adminSearchSource.put(userId, "yaml");
+            userStates.put(userId, "awaiting_search");
+            sendText(chatId, "Введіть ключові слова для пошуку у YAML:");
+        } else {
+            sendText(chatId, "❌ Невідома опція. Спробуйте ще раз.");
+        }
+    }
+
+    private void handleAdminSearchInput(Long userId, String chatId, String text) throws TelegramApiException {
+        List<Map<String, Object>> results = new ArrayList<>();
+        CatalogSearcher searcher = new CatalogSearcher();
+        String source = adminSearchSource.getOrDefault(userId, "mysql");
+
+        String keywords = text; // 🔹 використовуємо текст повідомлення як ключові слова
+
+        if ("mysql".equals(source)) {
+            results = searcher.searchByKeywordsAdmin(keywords);
+        } else if ("yaml".equals(source)) {
+            try {
+                results = CatalogUpdater.searchProductsByKeywords(keywords);
+            } catch (java.io.IOException e) {
+                sendText(chatId, "❌ Помилка при пошуку у YAML: " + e.getMessage());
+                return;
+            }
+        }
+
+        // Відправка результатів адміну
+        if (results.isEmpty()) {
+            sendText(chatId, "❌ Товар не знайдено: " + keywords);
+        } else {
+            StringBuilder sb = new StringBuilder("🔎 Знайдено товари:\n\n");
+            for (int i = 0; i < results.size(); i++) {
+                sb.append(i + 1).append(". ").append(results.get(i).get("name")).append("\n");
+            }
+            sendText(chatId, sb.toString());
+        }
     }
 
     // Головний метод створення меню відгуку
