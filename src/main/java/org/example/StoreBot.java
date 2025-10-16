@@ -626,12 +626,12 @@ public class StoreBot extends TelegramLongPollingBot {
 
                 case "⏭️ Дальше" -> {
                     int idx = adminOrderIndex.getOrDefault(userId, 0);
-                    adminOrderIndex.put(userId, idx + 1); // переходимо до наступного
+                    adminOrderIndex.put(userId, idx + 1);
                     showAdminOrder(userId, chatId);
                 }
                 case "⏮️ Назад" -> {
                     int idx = adminOrderIndex.getOrDefault(userId, 0);
-                    if (idx > 0) adminOrderIndex.put(userId, idx - 1); // повертаємося назад
+                    if (idx > 0) adminOrderIndex.put(userId, idx - 1);
                     showAdminOrder(userId, chatId);
                 }
 
@@ -642,7 +642,7 @@ public class StoreBot extends TelegramLongPollingBot {
                     // Відправляємо меню продавця
                     SendMessage menuMsg = createAdminMenu(chatId);
                     try {
-                        execute(menuMsg); // <-- відправка повідомлення через execute
+                        execute(menuMsg);
                     } catch (TelegramApiException e) {
                         e.printStackTrace();
                         sendText(chatId, "❌ Помилка при відправці меню продавця.");
