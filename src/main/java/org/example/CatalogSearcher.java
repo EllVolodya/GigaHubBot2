@@ -17,46 +17,36 @@ public class CatalogSearcher {
 
     public List<Map<String, Object>> searchByKeywordsAdmin(String keywords) {
         List<Map<String, Object>> results = new ArrayList<>();
-        if (keywords == null || keywords.trim().isEmpty()) return results;
 
-        String[] words = keywords.toLowerCase().split("\\s+");
+        if (keywords == null || keywords.isEmpty()) return results;
 
-        // --- 1. Пошук у MySQL ---
         String sql = """
-        SELECT p.*, s.name AS subcategory, c.name AS category
-        FROM products p
-        JOIN subcategories s ON p.subcategory_id = s.id
-        JOIN categories c ON s.category_id = c.id;
-    """;
+            SELECT p.*, s.name AS subcategory, c.name AS category
+            FROM products p
+            JOIN subcategories s ON p.subcategory_id = s.id
+            JOIN categories c ON s.category_id = c.id
+            WHERE LOWER(p.name) LIKE ?
+            """;
 
         try (Connection conn = DatabaseManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            while (rs.next()) {
-                Map<String, Object> product = mapProduct(rs);
-                String productName = product.get("name").toString().toLowerCase();
+            ps.setString(1, "%" + keywords.toLowerCase() + "%");
 
-                boolean matchesAll = true;
-                for (String word : words) {
-                    if (!productName.contains(word)) {
-                        matchesAll = false;
-                        break;
-                    }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> product = new HashMap<>();
+                    product.put("id", rs.getInt("id"));
+                    product.put("name", rs.getString("name"));
+                    product.put("price", rs.getString("price"));
+                    product.put("subcategory", rs.getString("subcategory"));
+                    product.put("category", rs.getString("category"));
+                    results.add(product);
                 }
-
-                if (matchesAll) results.add(product);
             }
 
         } catch (SQLException e) {
-            System.err.println("Помилка при пошуку у MySQL: " + e.getMessage());
-        }
-
-        try {
-            List<Map<String, Object>> yamlProducts = CatalogUpdater.searchProductsByKeywords(keywords);
-            results.addAll(yamlProducts);
-        } catch (IOException e) {
-            System.err.println("Помилка при пошуку у YAML: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return results;
