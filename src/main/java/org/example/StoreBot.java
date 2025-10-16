@@ -34,7 +34,10 @@ public class StoreBot extends TelegramLongPollingBot {
     private final Map<Long, String> currentCategory = new HashMap<>();
     private final Map<Long, String> currentSubcategory = new HashMap<>();
     private final Map<Long, Integer> productIndex = new HashMap<>();
+    private final Map<Long, Map<String, Object>> lastShownProduct = new HashMap<>();
+    private final Map<Long, String> userStates = new HashMap<>();
     private final Map<Long, List<Map<String, Object>>> userCart = new HashMap<>();
+    private final Map<Long, List<Map<String, Object>>> userOrders = new HashMap<>();
 
     //Права
     private final List<Long> ADMINS = List.of(620298889L, 1030917576L); //533570832L Лена
@@ -47,11 +50,8 @@ public class StoreBot extends TelegramLongPollingBot {
     private final Map<Long, String> adminEditingField = new HashMap<>();
     private final Map<Long, List<String>> adminMatchList = new HashMap<>();
     private final Map<Long, String> adminNewCategory = new HashMap<>();
-    private final Map<Long, String> userStates = new HashMap<>();
     private final List<String> hitItems = new ArrayList<>();
     private final Map<Long, List<String>> supportAnswers = new HashMap<>();
-    private final Map<Long, List<Map<String, Object>>> userOrders = new HashMap<>();
-    private final Map<Long, Map<String, Object>> lastShownProduct = new HashMap<>();
     private final Map<Long, Integer> adminOrderIndex = new HashMap<>();
     private final Map<String, Object> tempStorage = new HashMap<>();
 
@@ -721,16 +721,33 @@ public class StoreBot extends TelegramLongPollingBot {
         productIndex.remove(chatId);
     }
 
-    // 🔹 Категорії
-    private void sendCategories(Long chatId) throws TelegramApiException {
-        List<String> categories = catalogSearcher.getCategories();
+    // --- Категорії з MySQL ---
+    private void sendCategories(Long chatId) {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement("SELECT name FROM categories ORDER BY id")) {
 
-        ReplyKeyboardMarkup markup = ReplyKeyboardMarkup.builder()
-                .resizeKeyboard(true)
-                .keyboard(buildKeyboard(categories, true))
-                .build();
+            ResultSet rs = stmt.executeQuery();
+            List<String> categories = new ArrayList<>();
+            while (rs.next()) {
+                categories.add(rs.getString("name"));
+            }
 
-        sendMessage(chatId, "📂 Виберіть категорію:", markup);
+            if (categories.isEmpty()) {
+                sendText(chatId, "❌ Немає категорій у базі.");
+                return;
+            }
+
+            ReplyKeyboardMarkup markup = ReplyKeyboardMarkup.builder()
+                    .resizeKeyboard(true)
+                    .keyboard(buildKeyboard(categories, true))
+                    .build();
+
+            sendMessage(chatId, "📂 Виберіть категорію:", markup);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendText(chatId, "⚠️ Помилка при отриманні категорій із бази.");
+        }
     }
 
     // 🔹 Показ кошика
@@ -1668,25 +1685,35 @@ public class StoreBot extends TelegramLongPollingBot {
             return;
         }
 
-        try {
-            CatalogSearcher searcher = new CatalogSearcher();
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "SELECT p.id, p.name, p.price, p.unit, p.description, p.photo, " +
+                             "s.name AS subcategory_name, c.name AS category_name " +
+                             "FROM products p " +
+                             "JOIN subcategories s ON p.subcategory_id = s.id " +
+                             "JOIN categories c ON s.category_id = c.id " +
+                             "WHERE LOWER(p.name) LIKE ?"
+             )) {
+
+            stmt.setString(1, "%" + query.toLowerCase() + "%");
+            ResultSet rs = stmt.executeQuery();
+
             List<Map<String, Object>> foundProducts = new ArrayList<>();
 
-            // Пошук у плоскому списку products
-            for (Map<String, Object> p : searcher.getFlatProducts()) {
-                String productName = String.valueOf(p.getOrDefault("name", "")).toLowerCase();
-                if (productName.contains(query.toLowerCase())) {
-                    foundProducts.add(new HashMap<>(p));
-                }
+            while (rs.next()) {
+                Map<String, Object> product = new HashMap<>();
+                product.put("id", rs.getInt("id"));
+                product.put("name", rs.getString("name"));
+                product.put("price", rs.getDouble("price"));
+                product.put("unit", rs.getString("unit"));
+                product.put("description", rs.getString("description"));
+                product.put("photo", rs.getString("photo"));
+                product.put("category", rs.getString("category_name"));
+                product.put("subcategory", rs.getString("subcategory_name"));
+                foundProducts.add(product);
             }
 
-            // Пошук рекурсивно у catalog
-            List<Map<String, Object>> catalog = searcher.getCatalog();
-            if (catalog != null) {
-                searcher.extractProductsFromCatalogForSearch(catalog, foundProducts, query);
-            }
-
-            System.out.println("🔎 Total found products: " + foundProducts.size());
+            System.out.println("🔎 Total found products (MySQL): " + foundProducts.size());
 
             if (foundProducts.isEmpty()) {
                 sendText(chatId, "❌ Товар не знайдено. Спробуйте інший запит.");
@@ -1694,12 +1721,13 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            // Кілька результатів
+            // Якщо знайдено кілька товарів
             if (foundProducts.size() > 1) {
                 StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів. Введіть номер:\n\n");
                 int index = 1;
                 for (Map<String, Object> p : foundProducts) {
-                    sb.append(index++).append(". ").append(p.get("name")).append("\n");
+                    sb.append(index++).append(". ").append(p.get("name"))
+                            .append(" (").append(p.get("price")).append(" грн)\n");
                 }
                 searchResults.put(Long.parseLong(chatId), foundProducts);
                 userStates.put(userId, "waiting_for_product_number");
@@ -1707,7 +1735,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            // Один результат
+            // Якщо знайдено один товар
             searchResults.put(Long.parseLong(chatId), foundProducts);
             productIndex.put(Long.parseLong(chatId), 0);
             sendSearchedProduct(Long.parseLong(chatId));
@@ -1715,7 +1743,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
         } catch (Exception e) {
             e.printStackTrace();
-            sendText(chatId, "⚠️ Помилка під час пошуку товару.");
+            sendText(chatId, "⚠️ Помилка під час пошуку товару у базі.");
             userStates.remove(userId);
         }
     }
@@ -2470,69 +2498,120 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
     // --- Показ підкатегорій ---
-    private void sendSubcategories(Long chatId, String category) throws TelegramApiException {
-        List<String> subcats = catalogSearcher.getSubcategories(category);
+    private void sendSubcategories(Long chatId, String categoryName) {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "SELECT s.name FROM subcategories s " +
+                             "JOIN categories c ON s.category_id = c.id " +
+                             "WHERE c.name = ? ORDER BY s.id")) {
 
-        ReplyKeyboardMarkup markup = ReplyKeyboardMarkup.builder()
-                .resizeKeyboard(true)
-                .keyboard(buildKeyboard(subcats, true)) // <-- тепер кнопки по 3 в ряд
-                .build();
+            stmt.setString(1, categoryName);
+            ResultSet rs = stmt.executeQuery();
+            List<String> subcategories = new ArrayList<>();
+            while (rs.next()) {
+                subcategories.add(rs.getString("name"));
+            }
 
-        sendMessage(chatId, "📂 Виберіть підкатегорію:", markup);
+            if (subcategories.isEmpty()) {
+                sendText(chatId, "❌ У цій категорії немає підкатегорій.");
+                return;
+            }
+
+            ReplyKeyboardMarkup markup = ReplyKeyboardMarkup.builder()
+                    .resizeKeyboard(true)
+                    .keyboard(buildKeyboard(subcategories, true))
+                    .build();
+
+            sendMessage(chatId, "📁 Виберіть підкатегорію:", markup);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendText(chatId, "⚠️ Помилка при отриманні підкатегорій із бази.");
+        }
     }
 
-    // --- Показ товару ---
-    private void sendProduct(Long chatId) throws TelegramApiException {
-        String cat = currentCategory.get(chatId);
-        String sub = currentSubcategory.get(chatId);
+    // --- Показ товару з MySQL ---
+    private void sendProduct(Long chatId) {
+        String category = currentCategory.get(chatId);
+        String subcategory = currentSubcategory.get(chatId);
         int index = productIndex.getOrDefault(chatId, 0);
 
-        List<Map<String, Object>> products = catalogSearcher.getProducts(cat, sub);
-        if (products == null || products.isEmpty()) {
-            sendText(chatId, "❌ У цій підкатегорії немає товарів.");
+        if (category == null || subcategory == null) {
+            sendText(chatId, "⚠️ Спочатку оберіть категорію та підкатегорію.");
             return;
         }
 
-        if (index >= products.size()) index = 0;
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                     "SELECT p.id, p.name, p.price, p.unit, p.description, p.photo " +
+                             "FROM products p " +
+                             "JOIN subcategories s ON p.subcategory_id = s.id " +
+                             "JOIN categories c ON s.category_id = c.id " +
+                             "WHERE c.name = ? AND s.name = ? ORDER BY p.id")) {
 
-        Map<String, Object> product = products.get(index);
-        lastShownProduct.put(chatId, product); // зберігаємо останній показаний товар
+            stmt.setString(1, category);
+            stmt.setString(2, subcategory);
+            ResultSet rs = stmt.executeQuery();
 
-        String name = product.getOrDefault("name", "Без назви").toString();
-        String price = product.getOrDefault("price", "N/A").toString();
-        String unit = product.getOrDefault("unit", "шт").toString();
-        String description = product.getOrDefault("description", "").toString();
-        String photoPath = product.getOrDefault("photo", "").toString();
-        String manufacturer = product.getOrDefault("manufacturer", "").toString();
+            List<Map<String, Object>> products = new ArrayList<>();
+            while (rs.next()) {
+                Map<String, Object> product = new HashMap<>();
+                product.put("id", rs.getInt("id"));
+                product.put("name", rs.getString("name"));
+                product.put("price", rs.getDouble("price"));
+                product.put("unit", rs.getString("unit"));
+                product.put("description", rs.getString("description"));
+                product.put("photo", rs.getString("photo"));
+                products.add(product);
+            }
 
-        StringBuilder sb = new StringBuilder("📦 ").append(name)
-                .append("\n💰 Ціна: ").append(price).append(" грн за ").append(unit);
-        if (!manufacturer.isEmpty()) sb.append("\n🏭 Виробник: ").append(manufacturer);
-        if (!description.isEmpty()) sb.append("\n📖 ").append(description);
+            if (products.isEmpty()) {
+                sendText(chatId, "❌ У цій підкатегорії немає товарів.");
+                return;
+            }
 
-        KeyboardRow row = new KeyboardRow();
-        row.add("➡ Далі");
-        row.add("🛒 Додати в кошик");
-        row.add("🛒 Перейти в кошик");
+            if (index >= products.size()) index = 0;
+            Map<String, Object> product = products.get(index);
+            lastShownProduct.put(chatId, product);
 
-        List<KeyboardRow> kb = new ArrayList<>();
-        kb.add(row);
-        kb.add(new KeyboardRow(List.of(new KeyboardButton("⬅ Назад"))));
+            String name = Objects.toString(product.get("name"), "Без назви");
+            double price = (double) product.getOrDefault("price", 0.0);
+            String unit = Objects.toString(product.get("unit"), "шт");
+            String description = Objects.toString(product.get("description"), "");
+            String photo = Objects.toString(product.get("photo"), "");
 
-        ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
-        markup.setResizeKeyboard(true);
-        markup.setKeyboard(kb);
+            StringBuilder sb = new StringBuilder("📦 ").append(name)
+                    .append("\n💰 Ціна: ").append(price).append(" грн за ").append(unit);
+            if (!description.isEmpty()) sb.append("\n📖 ").append(description);
 
-        if (photoPath != null && !photoPath.isEmpty()) {
-            String fileName = new java.io.File(photoPath).getName();
-            sendPhotoFromResources(chatId.toString(), fileName, sb.toString(), markup);
-        } else {
-            sendText(chatId.toString(), sb.toString());
+            // --- Клавіатура ---
+            KeyboardRow row1 = new KeyboardRow();
+            row1.add("⬅ Назад");
+            row1.add("➡ Далі");
+
+            KeyboardRow row2 = new KeyboardRow();
+            row2.add("🛒 Додати в кошик");
+            row2.add("🛍 Перейти в кошик");
+
+            ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
+            markup.setResizeKeyboard(true);
+            markup.setKeyboard(List.of(row1, row2));
+
+            // --- Відправка ---
+            if (!photo.isEmpty()) {
+                sendPhotoFromResources(chatId.toString(), photo, sb.toString(), markup);
+            } else {
+                sendMessage(chatId, sb.toString(), markup);
+            }
+
+            // Зберігаємо позицію
+            index = (index + 1) % products.size();
+            productIndex.put(chatId, index);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendText(chatId, "⚠️ Помилка при завантаженні товарів із бази.");
         }
-
-        // Збільшуємо індекс для наступного показу
-        index = (index + 1) % products.size();
-        productIndex.put(chatId, index);
     }
 
     private void sendPhoto(String chatId, String fileName, String caption) {
