@@ -5,15 +5,8 @@ import java.util.*;
 
 public class CatalogSearcher {
 
-    private final Connection connection;
-
     public CatalogSearcher() {
-        try {
-            this.connection = DatabaseManager.getConnection();
-            System.out.println("✅ CatalogSearcher connected to DB!");
-        } catch (SQLException e) {
-            throw new RuntimeException("❌ Failed to get DB connection!", e);
-        }
+        System.out.println("✅ CatalogSearcher ready to query DB.");
     }
 
     // ---------------- Пошук по ключовим словам (для адміна) ----------------
@@ -30,10 +23,13 @@ public class CatalogSearcher {
             ORDER BY p.name;
         """;
 
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
             stmt.setString(1, "%" + keywords.toLowerCase() + "%");
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) results.add(mapProduct(rs));
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -55,10 +51,13 @@ public class CatalogSearcher {
             ORDER BY p.name;
         """;
 
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
             stmt.setString(1, "%" + name.toLowerCase() + "%");
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) results.add(mapProduct(rs));
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -70,12 +69,17 @@ public class CatalogSearcher {
     public List<String> getCategories() {
         List<String> categories = new ArrayList<>();
         String sql = "SELECT name FROM categories ORDER BY name;";
-        try (Statement stmt = connection.createStatement();
+
+        try (Connection conn = DatabaseManager.getConnection();
+             Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
+
             while (rs.next()) categories.add(rs.getString("name"));
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
         return categories;
     }
 
@@ -90,10 +94,13 @@ public class CatalogSearcher {
             ORDER BY s.name;
         """;
 
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
             stmt.setString(1, categoryName);
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) subcategories.add(rs.getString("name"));
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -113,11 +120,14 @@ public class CatalogSearcher {
             ORDER BY p.name;
         """;
 
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
             stmt.setString(1, categoryName);
             stmt.setString(2, subcategoryName);
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) products.add(mapProduct(rs));
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -136,9 +146,12 @@ public class CatalogSearcher {
             ORDER BY p.name;
         """;
 
-        try (Statement stmt = connection.createStatement();
+        try (Connection conn = DatabaseManager.getConnection();
+             Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
+
             while (rs.next()) products.add(mapProduct(rs));
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
