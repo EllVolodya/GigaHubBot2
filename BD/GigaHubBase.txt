@@ -1,0 +1,50 @@
+CREATE TABLE categories (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE subcategories (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    category_id INTEGER,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+);
+
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    price REAL,
+    unit TEXT DEFAULT 'шт',
+    description TEXT,
+    photo TEXT,
+    created_at DATE DEFAULT CURRENT_DATE,
+    subcategory_id INTEGER,
+    FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE CASCADE
+);
+
+CREATE TABLE invites (
+    id serial PRIMARY KEY,        -- автоінкрементний унікальний ID
+    name text NOT NULL,           -- ім'я
+    kasa text NOT NULL,           -- каса
+    city text NOT NULL,           -- місто
+    invite text NOT NULL,         -- посилання
+    number integer DEFAULT 0      -- лічильник переходів
+);
+
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    orderCode character(20) NOT NULL,
+    userId integer NOT NULL,
+    deliveryType text,
+    city text,
+    address text,
+    postOffice text,
+    fullName text,
+    phone text,
+    card text,
+    status text DEFAULT 'Нове',
+    comment text,
+    total real DEFAULT 0,
+    date date DEFAULT CURRENT_DATE,
+    item text
+);
