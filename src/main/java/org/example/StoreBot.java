@@ -914,7 +914,14 @@ public class StoreBot extends TelegramLongPollingBot {
         switch (state) {
 
             case "search_catalog" -> handleSearch(userId, chatId, text);
-            case "edit_product" -> handleEditProductStart(userId, chatId, text);
+            case "edit_product" -> {
+                try {
+                    handleEditProductStart(userId, chatId, text);
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                    sendText(userId, "❌ Помилка при редагуванні товару.");
+                }
+            }
             case "choose_product" -> handleChooseProduct(userId, chatId, text);
             case "editing" -> handleEditing(userId, chatId, text);
             case "awaiting_field_value" -> handleAwaitingField(userId, chatId, text);
@@ -1715,26 +1722,41 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
 
-    // ✏️ Початок редагування товару
-    private void handleEditProductStart(Long userId, String chatId, String text) {
+    // ✏️ Початок редагування товару для адміна
+    private void handleEditProductStart(Long userId, String chatId, String text) throws TelegramApiException {
+        // 1️⃣ Шукаємо товар у MySQL + catalog.yml
         List<Map<String, Object>> matchesMap = catalogSearcher.searchByKeywordsAdmin(text);
+
+        // 2️⃣ Формуємо список назв для відображення
         List<String> matches = new ArrayList<>();
         for (Map<String, Object> p : matchesMap) {
-            matches.add((String) p.get("name"));
+            matches.add(String.valueOf(p.get("name")));
         }
 
-        if (matches.isEmpty()) sendText(chatId, "❌ Товар не знайдено: " + text);
-        else if (matches.size() == 1) {
+        // 3️⃣ Якщо нічого не знайдено
+        if (matches.isEmpty()) {
+            sendText(chatId, "❌ Товар не знайдено: " + text);
+            return;
+        }
+
+        // 4️⃣ Якщо знайдено один товар
+        if (matches.size() == 1) {
             adminEditingProduct.put(userId, matches.get(0));
             userStates.put(userId, "editing");
             sendMessage(createEditMenu(chatId, matches.get(0)));
-        } else {
-            adminMatchList.put(userId, matches);
-            userStates.put(userId, "choose_product");
-            StringBuilder sb = new StringBuilder("Знайдено кілька товарів. Введіть номер:\n\n");
-            for (int i = 0; i < matches.size(); i++) sb.append(i + 1).append(". ").append(matches.get(i)).append("\n");
-            sendText(chatId, sb.toString());
+            return;
         }
+
+        // 5️⃣ Якщо знайдено кілька товарів — показуємо нумерований список
+        adminMatchList.put(userId, matches);
+        userStates.put(userId, "choose_product");
+
+        StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів. Введіть номер:\n\n");
+        for (int i = 0; i < matches.size(); i++) {
+            sb.append(i + 1).append(". ").append(matches.get(i)).append("\n");
+        }
+
+        sendText(chatId, sb.toString());
     }
 
     // Вибір товару по списку

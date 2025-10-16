@@ -14,25 +14,44 @@ public class CatalogSearcher {
         List<Map<String, Object>> results = new ArrayList<>();
         if (keywords == null || keywords.isEmpty()) return results;
 
+        String lowerKeywords = keywords.toLowerCase();
+
+        // --- 1. Пошук у MySQL ---
         String sql = """
-            SELECT p.*, s.name AS subcategory, c.name AS category
-            FROM products p
-            JOIN subcategories s ON p.subcategory_id = s.id
-            JOIN categories c ON s.category_id = c.id
-            WHERE LOWER(p.name) LIKE ?
-            ORDER BY p.name;
-        """;
+        SELECT p.*, s.name AS subcategory, c.name AS category
+        FROM products p
+        JOIN subcategories s ON p.subcategory_id = s.id
+        JOIN categories c ON s.category_id = c.id
+        WHERE LOWER(p.name) LIKE ?
+        ORDER BY p.id;
+    """;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setString(1, "%" + keywords.toLowerCase() + "%");
+            stmt.setString(1, "%" + lowerKeywords + "%");
             ResultSet rs = stmt.executeQuery();
-            while (rs.next()) results.add(mapProduct(rs));
+            while (rs.next()) {
+                results.add(mapProduct(rs));
+            }
 
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
+        // --- 2. Пошук у catalog.yml ---
+        List<Map<String, Object>> ymlProducts = getFlatProducts(); // метод, який читає YAML
+        for (Map<String, Object> product : ymlProducts) {
+            String name = String.valueOf(product.getOrDefault("name", "")).toLowerCase();
+            if (name.contains(lowerKeywords)) results.add(product);
+        }
+
+        // --- 3. Сортування за id (щоб MySQL + YAML йшло впорядковано) ---
+        results.sort((a, b) -> {
+            int idA = a.get("id") != null ? (int) a.get("id") : Integer.MAX_VALUE;
+            int idB = b.get("id") != null ? (int) b.get("id") : Integer.MAX_VALUE;
+            return Integer.compare(idA, idB);
+        });
 
         return results;
     }
