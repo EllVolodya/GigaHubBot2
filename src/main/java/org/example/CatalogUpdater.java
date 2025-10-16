@@ -85,7 +85,12 @@ public class CatalogUpdater {
         Yaml yaml = new Yaml();
         List<Map<String, Object>> result = new ArrayList<>();
 
-        try (InputStream in = new FileInputStream("src/main/resources/catalog.yml")) {
+        try (InputStream in = CatalogUpdater.class.getClassLoader().getResourceAsStream("catalog.yml")) {
+            if (in == null) {
+                System.out.println("❌ catalog.yml не знайдено у resources!");
+                return result;
+            }
+
             Map<String, Object> data = yaml.load(in);
             if (data == null || !data.containsKey("products")) return result;
 
