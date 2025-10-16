@@ -57,6 +57,7 @@ public class StoreBot extends TelegramLongPollingBot {
     private final Map<Long, Integer> adminOrderIndex = new HashMap<>();
     private final Map<Long, String> adminSearchKeyword = new HashMap<>();
     private Map<Long, String> adminSearchSource = new HashMap<>();
+    private Map<Long, List<Map<String, Object>>> adminSearchResults = new HashMap<>();
     private final Map<String, Object> tempStorage = new HashMap<>();
 
     private final CatalogSearcher catalogSearcher = new CatalogSearcher();
@@ -1796,7 +1797,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
     // Вибір товару по списку
     private void handleChooseProduct(Long userId, String chatId, String text) {
-        List<String> matches = adminMatchList.get(userId);
+        List<String> matches = adminMatchList.get(userId); // список назв товарів
         if (matches == null || matches.isEmpty()) {
             sendText(chatId, "❌ Помилка: список товарів порожній.");
             userStates.remove(userId);
@@ -1810,12 +1811,14 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            String selectedProduct = matches.get(index);
-            adminEditingProduct.put(userId, selectedProduct);
+            String selectedProductName = matches.get(index);
+            adminEditingProduct.put(userId, selectedProductName);
+
             userStates.put(userId, "editing");
             adminMatchList.remove(userId);
 
-            sendMessage(createEditMenu(chatId, selectedProduct));
+            sendMessage(createEditMenu(chatId, selectedProductName));
+
         } catch (NumberFormatException e) {
             sendText(chatId, "❌ Будь ласка, введіть номер із списку.");
         }
@@ -2792,26 +2795,34 @@ public class StoreBot extends TelegramLongPollingBot {
 
     private void handleAdminSearchInput(Long userId, String chatId, String text) throws TelegramApiException {
         List<Map<String, Object>> results = new ArrayList<>();
+        CatalogSearcher searcher = new CatalogSearcher();
         String source = adminSearchSource.getOrDefault(userId, "mysql");
 
         if ("mysql".equals(source)) {
-            CatalogSearcher searcher = new CatalogSearcher();
-            results = searcher.searchByKeywordsAdmin(text);
+            results = searcher.searchByKeywordsAdmin(text); // MySQL + YAML інтегровано тут
         } else if ("yaml".equals(source)) {
-            results = CatalogUpdater.searchProductsSimple(text);
+            results = CatalogUpdater.searchProductsSimple(text); // новий метод для простого YAML
         }
 
-        // Відправка результатів адміну
         if (results.isEmpty()) {
             sendText(chatId, "❌ Товар не знайдено: " + text);
-        } else {
-            StringBuilder sb = new StringBuilder("🔎 Знайдено товари:\n\n");
-            for (int i = 0; i < results.size(); i++) {
-                sb.append(i + 1).append(". ").append(results.get(i).get("name"))
-                        .append(" | Ціна: ").append(results.get(i).get("price")).append("\n");
-            }
-            sendText(chatId, sb.toString());
+            return;
         }
+
+        // Зберігаємо результати для користувача
+        adminSearchResults.put(userId, results);
+        userStates.put(userId, "choose_product");
+
+        // Відправляємо нумерований список
+        StringBuilder sb = new StringBuilder("🔎 Знайдено товари:\n\n");
+        for (int i = 0; i < results.size(); i++) {
+            sb.append(i + 1).append(". ").append(results.get(i).get("name"));
+            if (results.get(i).containsKey("price")) {
+                sb.append(" | Ціна: ").append(results.get(i).get("price"));
+            }
+            sb.append("\n");
+        }
+        sendText(chatId, sb.toString());
     }
 
     // Головний метод створення меню відгуку
