@@ -14,8 +14,6 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.io.InputStream;
 import java.io.FileOutputStream;
@@ -39,8 +37,8 @@ public class StoreBot extends TelegramLongPollingBot {
     private final Map<Long, List<Map<String, Object>>> userCart = new HashMap<>();
 
     //Права
-    private final List<Long> ADMINS = List.of(620298889L, 533570832L,1030917576L);
-    private final List<Long> DEVELOPERS = List.of(620298889L, 533570832L,1030917576L); // тут айді розробників
+    private final List<Long> ADMINS = List.of(620298889L, 1030917576L); //533570832L Лена
+    private final List<Long> DEVELOPERS = List.of(620298889L, 1030917576L); // тут айді розробників 533570832L
 
     // 🔹 Адмінські стани
     private Map<Long, Long> adminReplyTarget = new HashMap<>();
