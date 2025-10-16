@@ -40,8 +40,8 @@ public class StoreBot extends TelegramLongPollingBot {
     private final Map<Long, List<Map<String, Object>>> userOrders = new HashMap<>();
 
     //Права
-    private final List<Long> ADMINS = List.of(620298889L, 1030917576L); //533570832L Лена
-    private final List<Long> DEVELOPERS = List.of(620298889L, 1030917576L); // тут айді розробників 533570832L
+    private final List<Long> ADMINS = List.of(620298889L, 1030917576L, 533570832L);// тут айді продавців меню
+    private final List<Long> DEVELOPERS = List.of(620298889L, 1030917576L, 533570832L); // тут айді розробників меню
 
     // 🔹 Адмінські стани
     private Map<Long, Long> adminReplyTarget = new HashMap<>();
