@@ -2791,14 +2791,11 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
     private void showAdminOrder(Long adminId, String chatId) {
-        try {
-            // Беремо постійне підключення
-            Connection conn = DatabaseManager.getConnection();
+        try (Connection conn = DatabaseManager.getConnection()) {
 
             // Беремо всі активні замовлення
             String sql = "SELECT * FROM orders WHERE status != 'Видалено' ORDER BY id ASC";
             List<Map<String, Object>> orders = new ArrayList<>();
-
             try (PreparedStatement stmt = conn.prepareStatement(sql);
                  ResultSet rs = stmt.executeQuery()) {
 
@@ -2820,7 +2817,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
                     Object totalObj = rs.getObject("total");
                     double total = 0;
-                    if (totalObj instanceof Number n) total = n.doubleValue();
+                    if (totalObj instanceof Number) total = ((Number) totalObj).doubleValue();
                     else if (totalObj != null) {
                         try { total = Double.parseDouble(totalObj.toString()); } catch (Exception ignored) {}
                     }
@@ -2841,8 +2838,7 @@ public class StoreBot extends TelegramLongPollingBot {
             Map<String, Object> orderToShow = orders.get(idx);
 
             // Показуємо адміну
-            createOrderAdminMenu(chatId, orderToShow,
-                    orderToShow.get("userId") instanceof Long ? (Long) orderToShow.get("userId") : 0L);
+            createOrderAdminMenu(chatId, orderToShow, orderToShow.get("userId") instanceof Long ? (Long) orderToShow.get("userId") : 0L);
 
         } catch (SQLException e) {
             e.printStackTrace();
