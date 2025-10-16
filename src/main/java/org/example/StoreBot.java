@@ -1158,7 +1158,6 @@ public class StoreBot extends TelegramLongPollingBot {
                 } else {
                     sendText(chatId, "Будь ласка, напишіть 'З описом' або 'Тільки медіа'");
                 }
-                return;
             }
 
             case "awaiting_hit_title" -> {
@@ -1169,7 +1168,6 @@ public class StoreBot extends TelegramLongPollingBot {
                 tempStorage.put(userId + "_hit_title", text);
                 userStates.put(userId, "awaiting_hit_description");
                 sendText(chatId, "Введіть опис товару (або напишіть 'немає'):");
-                return;
             }
 
             case "awaiting_hit_description" -> {
@@ -1180,7 +1178,6 @@ public class StoreBot extends TelegramLongPollingBot {
                 tempStorage.put(userId + "_hit_description", text.equalsIgnoreCase("немає") ? "немає" : text);
                 userStates.put(userId, "awaiting_hit_media");
                 sendText(chatId, "Відправте фото або відео (або напишіть 'немає'):");
-                return;
             }
 
             case "awaiting_hit_media" -> {
@@ -1216,7 +1213,6 @@ public class StoreBot extends TelegramLongPollingBot {
                         } catch (Exception ignored) {}
                     }
                 }
-                return;
             }
 
             case "awaiting_hit_media_only" -> {
@@ -1248,7 +1244,6 @@ public class StoreBot extends TelegramLongPollingBot {
                         } catch (Exception ignored) {}
                     }
                 }
-                return;
             }
 
             // Обробка вибору доставки
