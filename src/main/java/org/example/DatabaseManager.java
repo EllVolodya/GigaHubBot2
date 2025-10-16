@@ -6,7 +6,7 @@ import java.sql.SQLException;
 
 public class DatabaseManager {
 
-    private static final String URL = "jdbc:mysql://crossover.proxy.rlwy.net:21254/railway?useUnicode=true&characterEncoding=UTF-8";
+    private static final String URL = "jdbc:mysql://crossover.proxy.rlwy.net:21254/railway?useUnicode=true&characterEncoding=UTF-8&connectTimeout=5000&socketTimeout=5000";
     private static final String USER = "root";
     private static final String PASSWORD = "ByZkOlzbofgNZSBVlPCdjayWsDBJfEcP";
 
@@ -30,7 +30,9 @@ public class DatabaseManager {
 
     // --- Отримати підключення (автоматично перепідключається, якщо закрите)
     public static Connection getConnection() throws SQLException {
+        System.out.println("ℹ️ Attempting to get DB connection...");
         if (connection == null || connection.isClosed()) {
+            System.out.println("ℹ️ Connection null or closed, connecting...");
             connect();
         }
         return connection;
