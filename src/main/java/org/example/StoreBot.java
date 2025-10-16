@@ -1560,7 +1560,7 @@ public class StoreBot extends TelegramLongPollingBot {
             case "delete_invite" -> {
                 try {
                     int id = Integer.parseInt(text.trim());
-                    boolean deleted = InviteManager.deleteInvite(id); // потрібно додати метод у InviteManager
+                    boolean deleted = InviteManager.deleteInvite(id); // потрібно додати метод InviteManager
                     if (deleted) sendText(chatId, "✅ Запрошення видалено!");
                     else sendText(chatId, "❌ Запрошення не знайдено.");
                 } catch (Exception e) {
@@ -1577,7 +1577,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 } else {
                     try {
                         int id = Integer.parseInt(parts[0]);
-                        boolean edited = InviteManager.editInvite(id, parts[1], parts[2], parts[3]); // потрібно додати метод у InviteManager
+                        boolean edited = InviteManager.editInvite(id, parts[1], parts[2], parts[3]);
                         if (edited) sendText(chatId, "✅ Запрошення відредаговано!");
                         else sendText(chatId, "❌ Запрошення не знайдено!");
                     } catch (Exception e) {
