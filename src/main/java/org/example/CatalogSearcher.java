@@ -2,6 +2,10 @@ package org.example;
 
 import java.sql.*;
 import java.util.*;
+import java.io.IOException;  // обов'язково
+import java.sql.*;
+import java.util.*;
+
 
 public class CatalogSearcher {
 
@@ -9,49 +13,49 @@ public class CatalogSearcher {
         System.out.println("✅ CatalogSearcher ready to query DB.");
     }
 
-    // ---------------- Пошук по ключовим словам (для адміна) ----------------
     public List<Map<String, Object>> searchByKeywordsAdmin(String keywords) {
         List<Map<String, Object>> results = new ArrayList<>();
-        if (keywords == null || keywords.isEmpty()) return results;
+        if (keywords == null || keywords.trim().isEmpty()) return results;
 
-        String lowerKeywords = keywords.toLowerCase();
+        String[] words = keywords.toLowerCase().split("\\s+");
 
         // --- 1. Пошук у MySQL ---
         String sql = """
         SELECT p.*, s.name AS subcategory, c.name AS category
         FROM products p
         JOIN subcategories s ON p.subcategory_id = s.id
-        JOIN categories c ON s.category_id = c.id
-        WHERE LOWER(p.name) LIKE ?
-        ORDER BY p.id;
+        JOIN categories c ON s.category_id = c.id;
     """;
 
         try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
 
-            stmt.setString(1, "%" + lowerKeywords + "%");
-            ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
-                results.add(mapProduct(rs));
+                Map<String, Object> product = mapProduct(rs);
+                String productName = product.get("name").toString().toLowerCase();
+
+                boolean matchesAll = true;
+                for (String word : words) {
+                    if (!productName.contains(word)) {
+                        matchesAll = false;
+                        break;
+                    }
+                }
+
+                if (matchesAll) results.add(product);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("Помилка при пошуку у MySQL: " + e.getMessage());
         }
 
-        // --- 2. Пошук у catalog.yml ---
-        List<Map<String, Object>> ymlProducts = getFlatProducts(); // метод, який читає YAML
-        for (Map<String, Object> product : ymlProducts) {
-            String name = String.valueOf(product.getOrDefault("name", "")).toLowerCase();
-            if (name.contains(lowerKeywords)) results.add(product);
+        try {
+            List<Map<String, Object>> yamlProducts = CatalogUpdater.searchProductsByKeywords(keywords);
+            results.addAll(yamlProducts);
+        } catch (IOException e) {
+            System.err.println("Помилка при пошуку у YAML: " + e.getMessage());
         }
-
-        // --- 3. Сортування за id (щоб MySQL + YAML йшло впорядковано) ---
-        results.sort((a, b) -> {
-            int idA = a.get("id") != null ? (int) a.get("id") : Integer.MAX_VALUE;
-            int idB = b.get("id") != null ? (int) b.get("id") : Integer.MAX_VALUE;
-            return Integer.compare(idA, idB);
-        });
 
         return results;
     }
