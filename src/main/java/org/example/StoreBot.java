@@ -2791,44 +2791,24 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
     private void handleAdminSearchInput(Long userId, String chatId, String text) throws TelegramApiException {
-        String source = adminSearchSource.getOrDefault(userId, "mysql");
         List<Map<String, Object>> results = new ArrayList<>();
+        String source = adminSearchSource.getOrDefault(userId, "mysql");
 
-        // --- 1. Пошук ---
         if ("mysql".equals(source)) {
             CatalogSearcher searcher = new CatalogSearcher();
-            results = searcher.searchByKeywordsAdmin(text); // повертає List<Map<String,Object>>
+            results = searcher.searchByKeywordsAdmin(text);
         } else if ("yaml".equals(source)) {
-            try {
-                results = CatalogUpdater.searchProductsByKeywords(text); // повертає List<Map<String,Object>>
-            } catch (IOException e) {
-                sendText(chatId, "❌ Помилка при пошуку у YAML: " + e.getMessage());
-                return;
-            }
+            results = CatalogUpdater.searchProductsSimple(text);
         }
 
-        // --- 2. Обробка результатів ---
+        // Відправка результатів адміну
         if (results.isEmpty()) {
             sendText(chatId, "❌ Товар не знайдено: " + text);
-            return;
-        }
-
-        if (results.size() == 1) {
-            // Лише один товар
-            Map<String, Object> product = results.get(0);
-            adminEditingProduct.put(userId, product.get("name").toString());
-            userStates.put(userId, "editing");
-            sendMessage(createEditMenu(chatId, product.get("name").toString())); // меню редагування
         } else {
-            // Кілька збігів — зберігаємо список назв
-            List<String> names = new ArrayList<>();
-            for (Map<String, Object> p : results) names.add(p.get("name").toString());
-            adminMatchList.put(userId, names);
-            userStates.put(userId, "choose_product");
-
-            StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів. Введіть номер:\n\n");
-            for (int i = 0; i < names.size(); i++) {
-                sb.append(i + 1).append(". ").append(names.get(i)).append("\n");
+            StringBuilder sb = new StringBuilder("🔎 Знайдено товари:\n\n");
+            for (int i = 0; i < results.size(); i++) {
+                sb.append(i + 1).append(". ").append(results.get(i).get("name"))
+                        .append(" | Ціна: ").append(results.get(i).get("price")).append("\n");
             }
             sendText(chatId, sb.toString());
         }

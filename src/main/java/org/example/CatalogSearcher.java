@@ -3,9 +3,11 @@ package org.example;
 import java.sql.*;
 import java.util.*;
 import java.io.IOException;  // обов'язково
-import java.sql.*;
-import java.util.*;
 
+import java.util.*;
+import java.util.List;                       // для List
+import java.util.Map;                        // для Map
+import java.util.ArrayList;                  // для ArrayList
 
 public class CatalogSearcher {
 

@@ -80,4 +80,38 @@ public class CatalogUpdater {
             yamlWriter.dump(products, writer);
         }
     }
+
+    public static List<Map<String, Object>> searchProductsSimple(String userInput) {
+        Yaml yaml = new Yaml();
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        try (InputStream in = new FileInputStream("src/main/resources/catalog.yml")) {
+            Map<String, Object> data = yaml.load(in);
+            if (data == null || !data.containsKey("products")) return result;
+
+            List<Map<String, Object>> products = (List<Map<String, Object>>) data.get("products");
+            if (products == null) return result;
+
+            String[] keywords = userInput.toLowerCase().split("\\s+");
+
+            for (Map<String, Object> product : products) {
+                String name = ((String) product.get("name")).toLowerCase();
+                boolean matches = true;
+
+                for (String kw : keywords) {
+                    if (!name.contains(kw)) {
+                        matches = false;
+                        break;
+                    }
+                }
+
+                if (matches) result.add(product);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return result;
+    }
 }
