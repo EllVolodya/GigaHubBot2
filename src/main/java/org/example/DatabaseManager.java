@@ -8,7 +8,7 @@ public class DatabaseManager {
 
     private static final String URL = "jdbc:mysql://crossover.proxy.rlwy.net:21254/railway?useUnicode=true&characterEncoding=UTF-8&connectTimeout=5000&socketTimeout=5000";
     private static final String USER = "root";
-    private static final String PASSWORD = "ByZkOlzbofgNZSBVlPCdjayWsDBJfEc";
+    private static final String PASSWORD = "ByZkOlzbofgNZSBVlPCdjayWsDBJfEcP";
 
     private static Connection connection;
 
