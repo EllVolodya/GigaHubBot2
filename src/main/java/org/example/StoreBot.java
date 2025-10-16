@@ -848,7 +848,7 @@ public class StoreBot extends TelegramLongPollingBot {
         int index = productIndex.getOrDefault(chatId, 0);
         Map<String, Object> product = products.get(index);
 
-        // Зберігаємо останній показаний товар для кнопки "Додати в кошик"
+        // Зберігаємо останній показаний товар
         lastShownProduct.put(chatId, product);
 
         String name = product.getOrDefault("name", "Без назви").toString();
@@ -863,6 +863,7 @@ public class StoreBot extends TelegramLongPollingBot {
         if (!manufacturer.isEmpty()) sb.append("\n🏭 Виробник: ").append(manufacturer);
         if (!description.isEmpty()) sb.append("\n📖 ").append(description);
 
+        // Створюємо клавіатуру
         KeyboardRow row = new KeyboardRow();
         row.add("➡ Далі");
         row.add("🛒 Додати в кошик");
@@ -875,16 +876,16 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setResizeKeyboard(true);
         markup.setKeyboard(kb);
 
+        // Відправляємо повідомлення з клавіатурою
         if (photoPath != null && !photoPath.isEmpty()) {
             String fileName = new java.io.File(photoPath).getName();
             sendPhotoFromResources(chatId.toString(), fileName, sb.toString(), markup);
         } else {
-            sendText(chatId.toString(), sb.toString());
+            sendTextWithMarkup(chatId, sb.toString(), markup);
         }
 
-        // Після показу товару збільшуємо індекс для наступного показу
-        index++;
-        if (index >= products.size()) index = 0;
+        // Після показу товару збільшуємо індекс
+        index = (index + 1) % products.size();
         productIndex.put(chatId, index);
     }
 
