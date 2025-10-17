@@ -34292,26 +34292,6 @@ catalog:
       photo: images/AgACAgIAAxkBAAJSqGjlOlmSgUAVqKWa_7a3nxCsJr3bAAI2-jEb0tYwS_MzByVrcAg6AQADAgADeQADNgQ.jpg
       unit: шт
       manufacturer: TexAC
-    - name: DWT Акум.дриль шуруп.СТ-21081Н-2 BMC.
-      price: '3000'
-      description: ''
-      photo: ''
-      unit: шт
-    - name: DWT Акум.дриль шуруп.ABSP-12 DN-2
-      price: '2450'
-      description: ''
-      photo: ''
-      unit: шт
-    - name: DWT Акум.дриль шуруп.ABS-18 L-2 BMC
-      price: '3010'
-      description: ''
-      photo: ''
-      unit: шт
-    - name: DWT Акум.дриль шуруп.ABS-14.4 DN-2 BMC
-      price: '2080'
-      description: ''
-      photo: ''
-      unit: шт
   - name: Мережеві
     products:
     - name: Верстат для заточ.ланцюгів Кентавр

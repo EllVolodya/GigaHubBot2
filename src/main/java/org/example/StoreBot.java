@@ -872,17 +872,25 @@ public class StoreBot extends TelegramLongPollingBot {
         Map<String, Object> product = products.get(index);
         lastShownProduct.put(chatId, product);
 
-        String name = product.getOrDefault("name", "Без назви").toString();
-        String price = product.getOrDefault("price", "N/A").toString();
-        String unit = product.getOrDefault("unit", "шт").toString();
-        String description = product.getOrDefault("description", "").toString();
-        String photo = product.getOrDefault("photo", "").toString();
-        String manufacturer = product.getOrDefault("manufacturer", "").toString();
+        // 🔒 Безпечне отримання всіх значень
+        String name = String.valueOf(product.getOrDefault("name", "Без назви"));
+        String price = String.valueOf(product.getOrDefault("price", "N/A"));
+        String unit = String.valueOf(product.getOrDefault("unit", "шт"));
+        String description = String.valueOf(product.getOrDefault("description", ""));
+        String photo = String.valueOf(product.getOrDefault("photo", ""));
+        String manufacturer = String.valueOf(product.getOrDefault("manufacturer", ""));
+
+        // 🔧 Якщо manufacturer був збережений як BLOB → конвертуємо
+        if (product.get("manufacturer") instanceof byte[] bytes) {
+            manufacturer = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        }
 
         StringBuilder sb = new StringBuilder("📦 ").append(name)
                 .append("\n💰 Ціна: ").append(price).append(" грн за ").append(unit);
-        if (!manufacturer.isEmpty()) sb.append("\n🏭 Виробник: ").append(manufacturer);
-        if (!description.isEmpty()) sb.append("\n📖 ").append(description);
+        if (!manufacturer.isEmpty() && !"null".equalsIgnoreCase(manufacturer))
+            sb.append("\n🏭 Виробник: ").append(manufacturer);
+        if (!description.isEmpty() && !"null".equalsIgnoreCase(description))
+            sb.append("\n📖 ").append(description);
 
         // Кнопки
         KeyboardRow row = new KeyboardRow();
@@ -899,7 +907,7 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setResizeKeyboard(true);
 
         // Відправка фото або тексту
-        if (photo != null && !photo.isEmpty()) {
+        if (photo != null && !photo.isEmpty() && !"null".equalsIgnoreCase(photo)) {
             sendPhotoFromResources(chatId.toString(), photo, sb.toString(), markup);
         } else {
             sendTextWithMarkup(chatId, sb.toString(), markup);
