@@ -5,6 +5,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.InputStream;
 import java.sql.*;
 import java.util.*;
+import java.nio.charset.StandardCharsets;
 
 public class CatalogEditor {
 
@@ -135,31 +136,25 @@ public class CatalogEditor {
             return false;
         }
 
-        productName = productName.trim(); // прибираємо зайві пробіли
+        productName = productName.trim();
         boolean clearManufacturer = manufacturer == null
                 || manufacturer.trim().isEmpty()
                 || manufacturer.equalsIgnoreCase("❌");
 
-        // Використовуємо LOWER(name) = LOWER(?) для ігнорування регістру
         String sql = clearManufacturer
                 ? "UPDATE products SET manufacturer = NULL WHERE LOWER(name) = LOWER(?)"
                 : "UPDATE products SET manufacturer = ? WHERE LOWER(name) = LOWER(?)";
 
-        System.out.println("DEBUG: Preparing to update manufacturer for product '" + productName + "' with value '" + manufacturer + "'");
-        System.out.println("DEBUG: SQL = " + sql);
-
         try (Connection conn = DatabaseManager.getConnection()) {
-            conn.setAutoCommit(true); // авто-комміт
+            conn.setAutoCommit(true);
 
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 if (clearManufacturer) {
                     stmt.setString(1, productName);
-                    System.out.println("DEBUG: Setting parameter 1 -> productName='" + productName + "'");
                 } else {
-                    stmt.setString(1, manufacturer.trim());
+                    byte[] manufacturerBytes = manufacturer.trim().getBytes(StandardCharsets.UTF_8);
+                    stmt.setBytes(1, manufacturerBytes);
                     stmt.setString(2, productName);
-                    System.out.println("DEBUG: Setting parameter 1 -> manufacturer='" + manufacturer.trim() + "'");
-                    System.out.println("DEBUG: Setting parameter 2 -> productName='" + productName + "'");
                 }
 
                 int rows = stmt.executeUpdate();
@@ -173,7 +168,7 @@ public class CatalogEditor {
                 if (clearManufacturer) {
                     System.out.println("✅ Виробника видалено для товару: " + productName);
                 } else {
-                    System.out.println("✅ Виробника збережено: " + manufacturer);
+                    System.out.println("✅ Виробника збережено для товару: " + productName);
                 }
 
                 return true;
