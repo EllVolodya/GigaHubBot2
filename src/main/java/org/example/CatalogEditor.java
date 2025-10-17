@@ -200,22 +200,75 @@ public class CatalogEditor {
 
     // --- Оновити будь-яке поле товару
     public static boolean updateField(String productName, String field, Object value) {
-        if (!isAllowedField(field)) {
+        if (productName == null || productName.trim().isEmpty()) {
+            System.out.println("❌ Назва продукту пуста");
+            return false;
+        }
+
+        productName = productName.trim();
+        System.out.println("DEBUG: Updating field '" + field + "' for product '" + productName + "' with value '" + value + "'");
+
+        boolean isBlobField = "manufacturer".equals(field);
+        boolean isAllowed = isBlobField || field.equals("price") || field.equals("description")
+                || field.equals("photo") || field.equals("unit");
+
+        if (!isAllowed) {
             System.out.println("❌ Заборонене поле: " + field);
             return false;
         }
 
-        String sql = "UPDATE products SET " + field + " = ? WHERE name = ?";
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        String sql = "UPDATE products SET " + field + " = ? WHERE LOWER(name) = LOWER(?)";
 
-            stmt.setObject(1, value);
-            stmt.setString(2, productName);
-            int rows = stmt.executeUpdate();
-            return rows > 0;
+        try (Connection conn = DatabaseManager.getConnection()) {
+            conn.setAutoCommit(true);
+
+            try (PreparedStatement checkStmt = conn.prepareStatement(
+                    "SELECT name FROM products WHERE LOWER(name) = LOWER(?)"
+            )) {
+                checkStmt.setString(1, productName);
+                ResultSet rs = checkStmt.executeQuery();
+                if (!rs.next()) {
+                    System.out.println("⚠️ DEBUG: Рядок з назвою '" + productName + "' не знайдено у базі.");
+                    return false;
+                } else {
+                    System.out.println("DEBUG: Рядок знайдено у базі: '" + rs.getString("name") + "'");
+                }
+            }
+
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                if (isBlobField) {
+                    // BLOB підтримка
+                    if (value == null || value.toString().trim().isEmpty() || value.toString().equalsIgnoreCase("❌")) {
+                        stmt.setNull(1, Types.BLOB);
+                        System.out.println("DEBUG: Setting manufacturer to NULL");
+                    } else {
+                        byte[] bytes = value.toString().trim().getBytes(StandardCharsets.UTF_8);
+                        stmt.setBytes(1, bytes);
+                        System.out.println("DEBUG: Setting manufacturer bytes -> " + value);
+                    }
+                } else {
+                    // Інші поля (price, description, unit, photo)
+                    stmt.setObject(1, value);
+                    System.out.println("DEBUG: Setting parameter 1 -> " + value);
+                }
+
+                stmt.setString(2, productName);
+                System.out.println("DEBUG: Setting parameter 2 -> productName='" + productName + "'");
+
+                int rows = stmt.executeUpdate();
+                System.out.println("DEBUG: Rows affected = " + rows);
+
+                if (rows == 0) {
+                    System.out.println("⚠️ Не вдалося оновити поле '" + field + "' для товару '" + productName + "'");
+                    return false;
+                }
+
+                System.out.println("✅ Поле '" + field + "' успішно оновлено для товару '" + productName + "'");
+                return true;
+            }
 
         } catch (SQLException e) {
-            System.err.println("❌ updateField error: " + e.getMessage());
+            System.err.println("❌ updateField SQL error: " + e.getMessage());
             return false;
         }
     }
