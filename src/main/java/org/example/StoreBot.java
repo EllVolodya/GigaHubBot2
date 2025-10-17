@@ -2972,7 +2972,6 @@ public class StoreBot extends TelegramLongPollingBot {
             photo.setCaption(caption);
             photo.setReplyMarkup(markup);
 
-            // 🔹 1. Якщо це посилання (Cloudinary, https://...)
             if (resourceFileName.startsWith("http://") || resourceFileName.startsWith("https://")) {
                 photo.setPhoto(new InputFile(resourceFileName));
                 execute(photo);
@@ -2980,7 +2979,6 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            // 🔹 2. Якщо це локальний ресурс (src/main/resources/images/)
             String resourcePath = "images/" + resourceFileName;
             InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath);
 
