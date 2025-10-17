@@ -129,7 +129,6 @@ public class CatalogEditor {
         }
     }
 
-    // --- Оновити виробника (повернули цей метод)
     public static boolean updateProductManufacturer(String productName, String manufacturer) {
         boolean clearManufacturer = manufacturer == null
                 || manufacturer.trim().isEmpty()
@@ -138,6 +137,9 @@ public class CatalogEditor {
         String sql = clearManufacturer
                 ? "UPDATE products SET manufacturer = NULL WHERE name = ?"
                 : "UPDATE products SET manufacturer = ? WHERE name = ?";
+
+        System.out.println("DEBUG: Preparing to update manufacturer for product '" + productName + "' with value '" + manufacturer + "'");
+        System.out.println("DEBUG: SQL = " + sql);
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -150,6 +152,7 @@ public class CatalogEditor {
             }
 
             int rows = stmt.executeUpdate();
+            System.out.println("DEBUG: Rows affected = " + rows);
 
             if (rows == 0) {
                 System.out.println("⚠️ Товар '" + productName + "' не знайдено у базі.");
