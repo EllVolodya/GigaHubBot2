@@ -130,6 +130,11 @@ public class CatalogEditor {
     }
 
     public static boolean updateProductManufacturer(String productName, String manufacturer) {
+        if (productName == null || productName.trim().isEmpty()) {
+            System.out.println("❌ Назва продукту пуста");
+            return false;
+        }
+
         boolean clearManufacturer = manufacturer == null
                 || manufacturer.trim().isEmpty()
                 || manufacturer.equalsIgnoreCase("❌");
@@ -141,31 +146,37 @@ public class CatalogEditor {
         System.out.println("DEBUG: Preparing to update manufacturer for product '" + productName + "' with value '" + manufacturer + "'");
         System.out.println("DEBUG: SQL = " + sql);
 
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseManager.getConnection()) {
+            conn.setAutoCommit(true);
 
-            if (clearManufacturer) {
-                stmt.setString(1, productName);
-            } else {
-                stmt.setString(1, manufacturer.trim());
-                stmt.setString(2, productName);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                if (clearManufacturer) {
+                    stmt.setString(1, productName.trim());
+                    System.out.println("DEBUG: Setting parameter 1 -> productName='" + productName.trim() + "'");
+                } else {
+                    stmt.setString(1, manufacturer.trim());
+                    stmt.setString(2, productName.trim());
+                    System.out.println("DEBUG: Setting parameter 1 -> manufacturer='" + manufacturer.trim() + "'");
+                    System.out.println("DEBUG: Setting parameter 2 -> productName='" + productName.trim() + "'");
+                }
+
+                int rows = stmt.executeUpdate();
+                System.out.println("DEBUG: Rows affected = " + rows);
+
+                if (rows == 0) {
+                    System.out.println("⚠️ Товар '" + productName + "' не знайдено у базі.");
+                    return false;
+                }
+
+                if (clearManufacturer) {
+                    System.out.println("✅ Виробника видалено для товару: " + productName);
+                } else {
+                    System.out.println("✅ Виробника збережено: " + manufacturer);
+                }
+
+                return true;
+
             }
-
-            int rows = stmt.executeUpdate();
-            System.out.println("DEBUG: Rows affected = " + rows);
-
-            if (rows == 0) {
-                System.out.println("⚠️ Товар '" + productName + "' не знайдено у базі.");
-                return false;
-            }
-
-            if (clearManufacturer) {
-                System.out.println("✅ Виробника видалено для товару: " + productName);
-            } else {
-                System.out.println("✅ Виробника збережено: " + manufacturer);
-            }
-
-            return true;
 
         } catch (SQLException e) {
             System.err.println("❌ updateProductManufacturer SQL error: " + e.getMessage());
