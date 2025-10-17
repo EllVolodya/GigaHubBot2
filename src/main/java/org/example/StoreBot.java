@@ -1098,6 +1098,8 @@ public class StoreBot extends TelegramLongPollingBot {
 
             case "awaiting_manufacturer" -> {
                 String productName = (String) tempStorage.get(userId + "_editingProduct");
+                System.out.println("DEBUG: Retrieved productName from tempStorage = '" + productName + "'");
+
                 if (productName == null) {
                     sendText(chatId, "❌ Не знайдено товар для редагування.");
                     userStates.put(userId, "admin_menu");
@@ -1105,8 +1107,10 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 String input = text.trim();
+                System.out.println("DEBUG: User input = '" + input + "'");
 
                 boolean success = CatalogEditor.updateProductManufacturer(productName, input);
+                System.out.println("DEBUG: updateProductManufacturer returned " + success);
 
                 if (!success) {
                     sendText(chatId, "⚠️ Не вдалося оновити виробника для товару: " + productName);
