@@ -1639,6 +1639,8 @@ public class StoreBot extends TelegramLongPollingBot {
                 String field = adminEditingField.get(userId);        // яке поле редагується
                 String productName = adminEditingProduct.get(userId);
 
+                System.out.println("DEBUG: User " + userId + " editing field = '" + field + "' for product = '" + productName + "'");
+
                 if (productName == null || field == null) {
                     sendText(chatId, "❌ Сталася помилка. Спробуйте ще раз.");
                     userStates.remove(userId);
@@ -1646,6 +1648,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 String newValue = text.trim();
+                System.out.println("DEBUG: New value entered = '" + newValue + "'");
 
                 // --- Перевірка для одиниці виміру ---
                 if ("unit".equals(field)) {
@@ -1656,8 +1659,14 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 try {
-                    CatalogEditor.updateField(productName, field, newValue);
-                    sendText(chatId, "✅ Поле '" + field + "' успішно оновлено для товару '" + productName + "'");
+                    boolean success = CatalogEditor.updateField(productName, field, newValue);
+                    System.out.println("DEBUG: updateField returned " + success);
+
+                    if (success) {
+                        sendText(chatId, "✅ Поле '" + field + "' успішно оновлено для товару '" + productName + "'");
+                    } else {
+                        sendText(chatId, "⚠️ Не вдалося оновити поле '" + field + "' для товару '" + productName + "'");
+                    }
                 } catch (Exception e) {
                     sendText(chatId, "❌ Сталася помилка при оновленні поля '" + field + "'");
                     e.printStackTrace();
