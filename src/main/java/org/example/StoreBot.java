@@ -2967,7 +2967,20 @@ public class StoreBot extends TelegramLongPollingBot {
 
     private void sendPhotoFromResources(String chatId, String resourceFileName, String caption, ReplyKeyboardMarkup markup) {
         try {
-            // Відносний шлях у src/main/resources, наприклад "images/фото.jpg"
+            SendPhoto photo = new SendPhoto();
+            photo.setChatId(chatId);
+            photo.setCaption(caption);
+            photo.setReplyMarkup(markup);
+
+            // 🔹 1. Якщо це посилання (Cloudinary, https://...)
+            if (resourceFileName.startsWith("http://") || resourceFileName.startsWith("https://")) {
+                photo.setPhoto(new InputFile(resourceFileName));
+                execute(photo);
+                System.out.println("[PHOTO] Фото успішно надіслано з URL: " + resourceFileName);
+                return;
+            }
+
+            // 🔹 2. Якщо це локальний ресурс (src/main/resources/images/)
             String resourcePath = "images/" + resourceFileName;
             InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath);
 
@@ -2977,19 +2990,10 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            InputFile inputFile = new InputFile(is, resourceFileName); // InputStream + назва файлу
-
-            SendPhoto photo = new SendPhoto();
-            photo.setChatId(chatId);
-            photo.setPhoto(inputFile);
-            photo.setCaption(caption);
-            photo.setReplyMarkup(markup);
-
+            photo.setPhoto(new InputFile(is, resourceFileName));
             execute(photo);
-            System.out.println("[PHOTO] Фото успішно надіслано: " + resourceFileName);
-
-            // Закриваємо InputStream після відправки
             is.close();
+            System.out.println("[PHOTO] Фото успішно надіслано з ресурсів: " + resourceFileName);
 
         } catch (Exception e) {
             e.printStackTrace();
