@@ -11,9 +11,9 @@ public class CloudinaryManager {
 
     static {
         cloudinary = new Cloudinary(ObjectUtils.asMap(
-                "cloud_name", System.getenv("dohs4bvma"),
-                "api_key", System.getenv("673113637171148"),
-                "api_secret", System.getenv("kcKYT7Ju_1g_x-00oxzuhBGs6Ps")
+                "cloud_name", "dohs4bvma",
+                "api_key", "673113637171148",
+                "api_secret", "kcKYT7Ju_1g_x-00oxzuhBGs6Ps"
         ));
     }
 
