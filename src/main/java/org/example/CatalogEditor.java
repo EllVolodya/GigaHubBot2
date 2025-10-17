@@ -141,27 +141,45 @@ public class CatalogEditor {
                 || manufacturer.trim().isEmpty()
                 || manufacturer.equalsIgnoreCase("❌");
 
-        String sql = clearManufacturer
-                ? "UPDATE products SET manufacturer = NULL WHERE LOWER(name) = LOWER(?)"
-                : "UPDATE products SET manufacturer = ? WHERE LOWER(name) = LOWER(?)";
-
         try (Connection conn = DatabaseManager.getConnection()) {
             conn.setAutoCommit(true);
+
+            // --- Дебаг: перевіримо, чи рядок взагалі існує ---
+            try (PreparedStatement checkStmt = conn.prepareStatement(
+                    "SELECT name FROM products WHERE LOWER(name) = LOWER(?)"
+            )) {
+                checkStmt.setString(1, productName);
+                ResultSet rs = checkStmt.executeQuery();
+                if (!rs.next()) {
+                    System.out.println("⚠️ DEBUG: Рядок з назвою '" + productName + "' не знайдено у базі.");
+                    return false;
+                } else {
+                    System.out.println("DEBUG: Рядок знайдено у базі: '" + rs.getString("name") + "'");
+                }
+            }
+
+            // --- Основне оновлення ---
+            String sql = clearManufacturer
+                    ? "UPDATE products SET manufacturer = NULL WHERE LOWER(name) = LOWER(?)"
+                    : "UPDATE products SET manufacturer = ? WHERE LOWER(name) = LOWER(?)";
 
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 if (clearManufacturer) {
                     stmt.setString(1, productName);
+                    System.out.println("DEBUG: Setting parameter 1 -> productName='" + productName + "'");
                 } else {
                     byte[] manufacturerBytes = manufacturer.trim().getBytes(StandardCharsets.UTF_8);
                     stmt.setBytes(1, manufacturerBytes);
                     stmt.setString(2, productName);
+                    System.out.println("DEBUG: Setting parameter 1 -> manufacturer='" + manufacturer + "'");
+                    System.out.println("DEBUG: Setting parameter 2 -> productName='" + productName + "'");
                 }
 
                 int rows = stmt.executeUpdate();
                 System.out.println("DEBUG: Rows affected = " + rows);
 
                 if (rows == 0) {
-                    System.out.println("⚠️ Товар '" + productName + "' не знайдено у базі.");
+                    System.out.println("⚠️ Товар '" + productName + "' не вдалося оновити.");
                     return false;
                 }
 
