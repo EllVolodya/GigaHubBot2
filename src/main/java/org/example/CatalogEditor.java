@@ -135,29 +135,31 @@ public class CatalogEditor {
             return false;
         }
 
+        productName = productName.trim(); // прибираємо зайві пробіли
         boolean clearManufacturer = manufacturer == null
                 || manufacturer.trim().isEmpty()
                 || manufacturer.equalsIgnoreCase("❌");
 
+        // Використовуємо LOWER(name) = LOWER(?) для ігнорування регістру
         String sql = clearManufacturer
-                ? "UPDATE products SET manufacturer = NULL WHERE name = ?"
-                : "UPDATE products SET manufacturer = ? WHERE name = ?";
+                ? "UPDATE products SET manufacturer = NULL WHERE LOWER(name) = LOWER(?)"
+                : "UPDATE products SET manufacturer = ? WHERE LOWER(name) = LOWER(?)";
 
         System.out.println("DEBUG: Preparing to update manufacturer for product '" + productName + "' with value '" + manufacturer + "'");
         System.out.println("DEBUG: SQL = " + sql);
 
         try (Connection conn = DatabaseManager.getConnection()) {
-            conn.setAutoCommit(true);
+            conn.setAutoCommit(true); // авто-комміт
 
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 if (clearManufacturer) {
-                    stmt.setString(1, productName.trim());
-                    System.out.println("DEBUG: Setting parameter 1 -> productName='" + productName.trim() + "'");
+                    stmt.setString(1, productName);
+                    System.out.println("DEBUG: Setting parameter 1 -> productName='" + productName + "'");
                 } else {
                     stmt.setString(1, manufacturer.trim());
-                    stmt.setString(2, productName.trim());
+                    stmt.setString(2, productName);
                     System.out.println("DEBUG: Setting parameter 1 -> manufacturer='" + manufacturer.trim() + "'");
-                    System.out.println("DEBUG: Setting parameter 2 -> productName='" + productName.trim() + "'");
+                    System.out.println("DEBUG: Setting parameter 2 -> productName='" + productName + "'");
                 }
 
                 int rows = stmt.executeUpdate();
@@ -175,7 +177,6 @@ public class CatalogEditor {
                 }
 
                 return true;
-
             }
 
         } catch (SQLException e) {
