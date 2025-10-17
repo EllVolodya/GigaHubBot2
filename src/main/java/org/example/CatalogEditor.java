@@ -131,17 +131,41 @@ public class CatalogEditor {
 
     // --- Оновити виробника (повернули цей метод)
     public static boolean updateProductManufacturer(String productName, String manufacturer) {
-        String sql = "UPDATE products SET manufacturer = ? WHERE name = ?";
+        boolean clearManufacturer = manufacturer == null
+                || manufacturer.trim().isEmpty()
+                || manufacturer.equalsIgnoreCase("❌");
+
+        String sql = clearManufacturer
+                ? "UPDATE products SET manufacturer = NULL WHERE name = ?"
+                : "UPDATE products SET manufacturer = ? WHERE name = ?";
+
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
-            stmt.setString(1, manufacturer);
-            stmt.setString(2, productName);
+            if (clearManufacturer) {
+                stmt.setString(1, productName);
+            } else {
+                stmt.setString(1, manufacturer.trim());
+                stmt.setString(2, productName);
+            }
+
             int rows = stmt.executeUpdate();
-            return rows > 0;
+
+            if (rows == 0) {
+                System.out.println("⚠️ Товар '" + productName + "' не знайдено у базі.");
+                return false;
+            }
+
+            if (clearManufacturer) {
+                System.out.println("✅ Виробника видалено для товару: " + productName);
+            } else {
+                System.out.println("✅ Виробника збережено: " + manufacturer);
+            }
+
+            return true;
 
         } catch (SQLException e) {
-            System.err.println("❌ updateProductManufacturer error: " + e.getMessage());
+            System.err.println("❌ updateProductManufacturer SQL error: " + e.getMessage());
             return false;
         }
     }

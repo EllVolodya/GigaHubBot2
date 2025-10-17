@@ -153,7 +153,6 @@ public class StoreBot extends TelegramLongPollingBot {
                     }
 
                     case "awaiting_manufacturer" -> {
-                        // 1️⃣ Беремо назву товару з тимчасового сховища
                         String productName = (String) tempStorage.get(userId + "_editingProduct");
                         if (productName == null) {
                             sendText(chatId, "❌ Не знайдено товар для редагування.");
@@ -161,21 +160,19 @@ public class StoreBot extends TelegramLongPollingBot {
                             return;
                         }
 
-                        // 2️⃣ Оновлюємо виробника через CatalogEditor
                         String input = text.trim();
-                        try {
-                            CatalogEditor.updateProductManufacturer(productName, input);
-                            if (input.equalsIgnoreCase("❌") || input.isEmpty()) {
-                                sendText(chatId, "✅ Виробник видалено для товару: " + productName);
-                            } else {
-                                sendText(chatId, "✅ Виробник збережено: " + input);
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                            sendText(chatId, "⚠️ Помилка при оновленні catalog.yml: " + e.getMessage());
+
+                        boolean success = CatalogEditor.updateProductManufacturer(productName, input);
+
+                        if (!success) {
+                            sendText(chatId, "⚠️ Не вдалося оновити виробника для товару: " + productName);
+                        } else if (input.equalsIgnoreCase("❌") || input.isEmpty()) {
+                            sendText(chatId, "✅ Виробник видалений для товару: " + productName);
+                        } else {
+                            sendText(chatId, "✅ Виробник збережений: " + input);
                         }
 
-                        // 3️⃣ Повертаємо користувача в меню редагування
+                        // Повертаємо користувача назад у меню редагування
                         sendText(chatId, createEditMenu(chatId, productName).getText());
                         userStates.put(userId, "edit_product");
                     }
