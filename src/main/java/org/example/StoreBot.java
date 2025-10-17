@@ -151,31 +151,6 @@ public class StoreBot extends TelegramLongPollingBot {
                         userStates.remove(userId);
                         sendText(chatId, "✅ Ваше замовлення на самовивіз успішно оформлено!\nКод замовлення: " + orderCode);
                     }
-
-                    case "awaiting_manufacturer" -> {
-                        String productName = (String) tempStorage.get(userId + "_editingProduct");
-                        if (productName == null) {
-                            sendText(chatId, "❌ Не знайдено товар для редагування.");
-                            userStates.put(userId, "admin_menu");
-                            return;
-                        }
-
-                        String input = text.trim();
-
-                        boolean success = CatalogEditor.updateProductManufacturer(productName, input);
-
-                        if (!success) {
-                            sendText(chatId, "⚠️ Не вдалося оновити виробника для товару: " + productName);
-                        } else if (input.equalsIgnoreCase("❌") || input.isEmpty()) {
-                            sendText(chatId, "✅ Виробник видалений для товару: " + productName);
-                        } else {
-                            sendText(chatId, "✅ Виробник збережений: " + input);
-                        }
-
-                        // Повертаємо користувача назад у меню редагування
-                        sendText(chatId, createEditMenu(chatId, productName).getText());
-                        userStates.put(userId, "edit_product");
-                    }
                 }
             }
 
@@ -1119,6 +1094,31 @@ public class StoreBot extends TelegramLongPollingBot {
                 userStates.remove(userId);
                 tempStorage.remove(userId + "_reply_to");
                 tempStorage.remove(userId + "_user_message");
+            }
+
+            case "awaiting_manufacturer" -> {
+                String productName = (String) tempStorage.get(userId + "_editingProduct");
+                if (productName == null) {
+                    sendText(chatId, "❌ Не знайдено товар для редагування.");
+                    userStates.put(userId, "admin_menu");
+                    return;
+                }
+
+                String input = text.trim();
+
+                boolean success = CatalogEditor.updateProductManufacturer(productName, input);
+
+                if (!success) {
+                    sendText(chatId, "⚠️ Не вдалося оновити виробника для товару: " + productName);
+                } else if (input.equalsIgnoreCase("❌") || input.isEmpty()) {
+                    sendText(chatId, "✅ Виробник видалений для товару: " + productName);
+                } else {
+                    sendText(chatId, "✅ Виробник збережений: " + input);
+                }
+
+                // Повертаємо користувача назад у меню редагування
+                sendText(chatId, createEditMenu(chatId, productName).getText());
+                userStates.put(userId, "edit_product");
             }
 
             case "choose_delivery_type" -> {
