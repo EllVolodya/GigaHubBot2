@@ -2049,35 +2049,27 @@ public class StoreBot extends TelegramLongPollingBot {
         try {
             if (photos == null || photos.isEmpty()) {
                 sendText(chatId, "❌ Фото не отримано. Спробуйте ще раз.");
-                System.out.println("[PHOTO] Список фото порожній для userId=" + userId);
                 return;
             }
 
             String productName = adminEditingProduct.get(userId);
             if (productName == null) {
                 sendText(chatId, "❌ Назву товару не знайдено. Почніть редагування заново.");
-                System.out.println("[PHOTO] Товар для редагування не знайдено для userId=" + userId);
                 return;
             }
 
-            // Беремо останнє фото (найбільше за розміром)
+            // Беремо найбільше фото
             PhotoSize photo = photos.get(photos.size() - 1);
             String fileId = photo.getFileId();
-            System.out.println("[PHOTO] Отримано fileId: " + fileId);
-
             org.telegram.telegrambots.meta.api.methods.GetFile getFileMethod = new GetFile(fileId);
             org.telegram.telegrambots.meta.api.objects.File file = execute(getFileMethod);
 
-            // Створюємо каталог src/main/resources/images, якщо його нема
-            java.io.File dir = new java.io.File("src/main/resources/images");
-            if (!dir.exists()) dir.mkdirs();
+            // Завантажуємо файл із Telegram
+            String filePath = file.getFileUrl(getBotToken());
+            java.io.File tempFile = new java.io.File("temp_" + fileId + ".jpg");
 
-            // Зберігаємо файл з fileId.jpg у resources/images
-            String filePath = "src/main/resources/images/" + fileId + ".jpg";
-            java.io.File localFile = new java.io.File(filePath);
-
-            try (InputStream is = new URL(file.getFileUrl(getBotToken())).openStream();
-                 FileOutputStream fos = new FileOutputStream(localFile)) {
+            try (InputStream is = new URL(filePath).openStream();
+                 FileOutputStream fos = new FileOutputStream(tempFile)) {
                 byte[] buffer = new byte[4096];
                 int read;
                 while ((read = is.read(buffer)) != -1) {
@@ -2085,15 +2077,24 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
             }
 
-            System.out.println("[PHOTO] Фото успішно збережено: " + localFile.getAbsolutePath());
+            // Перевіряємо старе фото (з YAML або БД)
+            String oldPhotoUrl = CatalogEditor.getField(productName, "photo");
+            if (oldPhotoUrl != null && !oldPhotoUrl.isEmpty() && oldPhotoUrl.startsWith("http")) {
+                CloudinaryManager.deleteImage(oldPhotoUrl);
+            }
 
-            // Оновлюємо поле photo у YAML з відносним шляхом для JAR
-            String relativePath = "images/" + fileId + ".jpg";
-            CatalogEditor.updateField(productName, "photo", relativePath);
+            // Завантажуємо нове фото у Cloudinary
+            String imageUrl = CloudinaryManager.uploadImage(tempFile, "products");
 
-            sendText(chatId, "✅ Фото успішно додано до товару '" + productName + "'.");
+            // Видаляємо локальний тимчасовий файл
+            tempFile.delete();
 
-            // Очищуємо стан користувача
+            // Оновлюємо поле photo у YAML або БД
+            CatalogEditor.updateField(productName, "photo", imageUrl);
+
+            sendText(chatId, "✅ Фото оновлено у хмарі для товару '" + productName + "'.");
+
+            // Скидаємо стан користувача
             userStates.remove(userId);
             adminEditingProduct.remove(userId);
 
@@ -2547,7 +2548,7 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setKeyboard(keyboard);
         markup.setResizeKeyboard(true);
 
-        // Відправка фото або тексту
+        // Отправка фото або тексту
         if (photo != null && !photo.isEmpty()) {
             sendPhotoFromResources(chatId.toString(), photo, sb.toString(), markup);
         } else {

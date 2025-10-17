@@ -3,10 +3,7 @@ package org.example;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.InputStream;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.*;
 
 public class CatalogEditor {
@@ -22,7 +19,7 @@ public class CatalogEditor {
 
             checkStmt.setString(1, categoryName);
             ResultSet rs = checkStmt.executeQuery();
-            if (rs.next()) return false; // Категорія вже існує
+            if (rs.next()) return false;
 
             insertStmt.setString(1, categoryName);
             insertStmt.executeUpdate();
@@ -30,7 +27,7 @@ public class CatalogEditor {
             return true;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("❌ addCategory error: " + e.getMessage());
             return false;
         }
     }
@@ -46,7 +43,7 @@ public class CatalogEditor {
             return rows > 0;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("❌ deleteCategory error: " + e.getMessage());
             return false;
         }
     }
@@ -62,19 +59,16 @@ public class CatalogEditor {
              PreparedStatement checkStmt = conn.prepareStatement(checkSubSql);
              PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
 
-            // Знайти категорію
             findCategoryStmt.setString(1, categoryName);
             ResultSet categoryRs = findCategoryStmt.executeQuery();
             if (!categoryRs.next()) return false;
             int categoryId = categoryRs.getInt("id");
 
-            // Перевірити, чи вже існує підкатегорія
             checkStmt.setString(1, subcategoryName);
             checkStmt.setInt(2, categoryId);
             ResultSet rs = checkStmt.executeQuery();
             if (rs.next()) return false;
 
-            // Додати підкатегорію
             insertStmt.setString(1, subcategoryName);
             insertStmt.setInt(2, categoryId);
             insertStmt.executeUpdate();
@@ -83,7 +77,7 @@ public class CatalogEditor {
             return true;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("❌ addSubcategory error: " + e.getMessage());
             return false;
         }
     }
@@ -93,8 +87,8 @@ public class CatalogEditor {
         String findSubSql = "SELECT id FROM subcategories WHERE name = ?";
         String checkProductSql = "SELECT id FROM products WHERE name = ? AND subcategory_id = ?";
         String insertSql = """
-        INSERT INTO products (name, price, unit, description, photo, created_at, subcategory_id)
-        VALUES (?, ?, ?, ?, ?, CURRENT_DATE, ?)
+            INSERT INTO products (name, price, unit, description, photo, created_at, subcategory_id)
+            VALUES (?, ?, ?, ?, ?, CURRENT_DATE, ?)
         """;
 
         try (Connection conn = DatabaseManager.getConnection();
@@ -102,45 +96,40 @@ public class CatalogEditor {
              PreparedStatement checkStmt = conn.prepareStatement(checkProductSql);
              PreparedStatement insertStmt = conn.prepareStatement(insertSql)) {
 
-            // Знайти підкатегорію
             findSubStmt.setString(1, subcategoryName);
             ResultSet subRs = findSubStmt.executeQuery();
             if (!subRs.next()) {
-                System.out.println("DEBUG: Subcategory '" + subcategoryName + "' not found");
+                System.out.println("❌ Підкатегорію '" + subcategoryName + "' не знайдено");
                 return false;
             }
             int subcategoryId = subRs.getInt("id");
 
-            // Перевірити, чи товар уже існує
             checkStmt.setString(1, productName);
             checkStmt.setInt(2, subcategoryId);
             ResultSet rs = checkStmt.executeQuery();
             if (rs.next()) {
-                System.out.println("DEBUG: Product '" + productName + "' already exists in subcategory");
+                System.out.println("⚠️ Товар '" + productName + "' вже існує");
                 return false;
             }
 
-            // Вставка продукту
             insertStmt.setString(1, productName);
             insertStmt.setDouble(2, price);
-            insertStmt.setString(3, "шт"); // default unit
-            insertStmt.setString(4, "");    // default description
-            insertStmt.setString(5, "");    // default photo
+            insertStmt.setString(3, "шт");
+            insertStmt.setString(4, "");
+            insertStmt.setString(5, "");
             insertStmt.setInt(6, subcategoryId);
 
-            System.out.println("DEBUG: Inserting product '" + productName + "' with price " + price);
             insertStmt.executeUpdate();
-
-            System.out.println("✅ Product '" + productName + "' added to subcategory '" + subcategoryName + "'");
+            System.out.println("✅ Додано товар '" + productName + "' у '" + subcategoryName + "'");
             return true;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("❌ addProductToSubcategory error: " + e.getMessage());
             return false;
         }
     }
 
-    // --- Оновити виробника
+    // --- Оновити виробника (повернули цей метод)
     public static boolean updateProductManufacturer(String productName, String manufacturer) {
         String sql = "UPDATE products SET manufacturer = ? WHERE name = ?";
         try (Connection conn = DatabaseManager.getConnection();
@@ -152,28 +141,7 @@ public class CatalogEditor {
             return rows > 0;
 
         } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    // --- Допоміжний метод: обмеження оновлення лише дозволених полів
-    private static boolean isAllowedField(String field) {
-        return field.equals("price") || field.equals("description") || field.equals("photo") || field.equals("unit");
-    }
-
-    // --- Перевірка існування категорії
-    public static boolean categoryExists(String categoryName) {
-        String sql = "SELECT id FROM categories WHERE name = ?";
-        try (Connection conn = DatabaseManager.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setString(1, categoryName);
-            ResultSet rs = stmt.executeQuery();
-            return rs.next();
-
-        } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("❌ updateProductManufacturer error: " + e.getMessage());
             return false;
         }
     }
@@ -195,60 +163,53 @@ public class CatalogEditor {
             return rows > 0;
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("❌ updateField error: " + e.getMessage());
             return false;
         }
     }
 
-    // --- Отримати ціну продукту з YAML
-    public static double getProductPriceFromYAML(String productName) {
-        try (InputStream inputStream = CatalogEditor.class.getClassLoader().getResourceAsStream("catalog.yml")) {
-            if (inputStream == null) {
-                System.out.println("DEBUG: catalog.yml not found");
-                return 0.0;
-            }
-
-            Yaml yaml = new Yaml();
-            Map<String, Object> data = yaml.load(inputStream); // отримуємо кореневу карту
-
-            Object productsObj = data.get("products"); // беремо список продуктів
-            if (!(productsObj instanceof List)) {
-                System.out.println("DEBUG: 'products' key is missing or not a list");
-                return 0.0;
-            }
-
-            List<Map<String, Object>> products = (List<Map<String, Object>>) productsObj;
-
-            for (Map<String, Object> product : products) {
-                Object nameObj = product.get("name");
-                if (nameObj == null) continue;
-
-                String name = nameObj.toString().trim();
-                if (name.equalsIgnoreCase(productName.trim()) || name.contains(productName.trim())) {
-                    Object priceObj = product.get("price");
-                    if (priceObj != null) {
-                        try {
-                            double price = Double.parseDouble(priceObj.toString().replace(",", ".").trim());
-                            System.out.println("DEBUG: Found price for '" + productName + "' = " + price);
-                            return price;
-                        } catch (NumberFormatException e) {
-                            e.printStackTrace();
-                            return 0.0;
-                        }
-                    }
-                    return 0.0;
-                }
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
+    // --- Отримати будь-яке поле товару у вигляді String
+    public static String getField(String productName, String field) {
+        if (!isAllowedField(field) && !field.equals("manufacturer")) {
+            System.out.println("❌ Заборонене поле: " + field);
+            return null;
         }
 
-        System.out.println("DEBUG: Product '" + productName + "' not found in YAML");
-        return 0.0;
+        String sql = "SELECT " + field + " FROM products WHERE name = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, productName);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                Object value = rs.getObject(field);
+                return value != null ? value.toString() : null;
+            }
+            return null;
+
+        } catch (SQLException e) {
+            System.err.println("❌ getField error: " + e.getMessage());
+            return null;
+        }
     }
 
-    // --- Перевірка існування підкатегорії
+    // --- Перевірити існування категорії
+    public static boolean categoryExists(String categoryName) {
+        String sql = "SELECT id FROM categories WHERE name = ?";
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, categoryName);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next();
+
+        } catch (SQLException e) {
+            System.err.println("❌ categoryExists error: " + e.getMessage());
+            return false;
+        }
+    }
+
+    // --- Перевірити існування підкатегорії
     public static boolean subcategoryExists(String subcategoryName) {
         String sql = "SELECT id FROM subcategories WHERE name = ?";
         try (Connection conn = DatabaseManager.getConnection();
@@ -259,8 +220,46 @@ public class CatalogEditor {
             return rs.next();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("❌ subcategoryExists error: " + e.getMessage());
             return false;
         }
+    }
+
+    // --- Отримати ціну продукту з YAML
+    public static double getProductPriceFromYAML(String productName) {
+        try (InputStream inputStream = CatalogEditor.class.getClassLoader().getResourceAsStream("catalog.yml")) {
+            if (inputStream == null) return 0.0;
+
+            Yaml yaml = new Yaml();
+            Map<String, Object> data = yaml.load(inputStream);
+            Object productsObj = data.get("products");
+            if (!(productsObj instanceof List<?> products)) return 0.0;
+
+            for (Object obj : products) {
+                if (obj instanceof Map<?, ?> product) {
+                    Object nameObj = product.get("name");
+                    if (nameObj == null) continue;
+
+                    String name = nameObj.toString().trim();
+                    if (name.equalsIgnoreCase(productName.trim())) {
+                        Object priceObj = product.get("price");
+                        if (priceObj != null) {
+                            return Double.parseDouble(priceObj.toString().replace(",", ".").trim());
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ getProductPriceFromYAML error: " + e.getMessage());
+        }
+        return 0.0;
+    }
+
+    // --- Дозволені поля
+    private static boolean isAllowedField(String field) {
+        return switch (field) {
+            case "price", "description", "photo", "unit" -> true;
+            default -> false;
+        };
     }
 }
