@@ -2515,12 +2515,14 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
-    // Показ товару
+    // 🔹 Показ товару
     private void sendProduct(Long chatId) throws TelegramApiException {
         String category = currentCategory.get(chatId);
         String subcategory = currentSubcategory.get(chatId);
 
-        // Ініціалізація productIndex, якщо ще немає
+        System.out.println("DEBUG: sendProduct() called for chatId=" + chatId);
+        System.out.println("DEBUG: Category=" + category + ", Subcategory=" + subcategory);
+
         int index = productIndex.getOrDefault(chatId, 0);
 
         CatalogSearcher searcher = new CatalogSearcher();
@@ -2528,31 +2530,48 @@ public class StoreBot extends TelegramLongPollingBot {
 
         if (products == null || products.isEmpty()) {
             sendText(chatId, "❌ У цій підкатегорії немає товарів.");
+            System.out.println("DEBUG: No products found for category=" + category + ", subcategory=" + subcategory);
             return;
         }
 
-        // Впорядкування по id для гарантованого порядку
         products.sort(Comparator.comparingInt(p -> ((Number) p.get("id")).intValue()));
 
-        // Переконаємось, що index в допустимому діапазоні
         if (index >= products.size() || index < 0) index = 0;
 
         Map<String, Object> product = products.get(index);
         lastShownProduct.put(chatId, product);
 
-        String name = product.getOrDefault("name", "Без назви").toString();
-        String price = product.getOrDefault("price", "N/A").toString();
-        String unit = product.getOrDefault("unit", "шт").toString();
-        String description = product.getOrDefault("description", "").toString();
-        String photo = product.getOrDefault("photo", "").toString();
-        String manufacturer = product.getOrDefault("manufacturer", "").toString();
+        // 🧩 Безпечне читання значень
+        String name = String.valueOf(product.getOrDefault("name", "Без назви"));
+        String price = String.valueOf(product.getOrDefault("price", "N/A"));
+        String unit = String.valueOf(product.getOrDefault("unit", "шт"));
+        String description = String.valueOf(product.getOrDefault("description", ""));
+        String photo = String.valueOf(product.getOrDefault("photo", ""));
+        String manufacturer = "";
 
+        // Якщо виробник збережений як BLOB
+        Object manufacturerObj = product.get("manufacturer");
+        if (manufacturerObj instanceof byte[] bytes) {
+            manufacturer = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        } else if (manufacturerObj != null) {
+            manufacturer = String.valueOf(manufacturerObj);
+        }
+
+        System.out.println("DEBUG: Showing product -> " + name);
+        System.out.println("DEBUG: Manufacturer = " + manufacturer);
+        System.out.println("DEBUG: Photo = " + photo);
+
+        // 🧾 Формування повідомлення
         StringBuilder sb = new StringBuilder("📦 ").append(name)
                 .append("\n💰 Ціна: ").append(price).append(" грн за ").append(unit);
-        if (!manufacturer.isEmpty()) sb.append("\n🏭 Виробник: ").append(manufacturer);
-        if (!description.isEmpty()) sb.append("\n📖 ").append(description);
 
-        // Кнопки
+        if (!manufacturer.isEmpty() && !"null".equalsIgnoreCase(manufacturer))
+            sb.append("\n🏭 Виробник: ").append(manufacturer);
+
+        if (!description.isEmpty() && !"null".equalsIgnoreCase(description))
+            sb.append("\n📖 ").append(description);
+
+        // 🧭 Кнопки
         KeyboardRow row = new KeyboardRow();
         row.add("➡ Далі");
         row.add("🛒 Додати в кошик");
@@ -2566,16 +2585,18 @@ public class StoreBot extends TelegramLongPollingBot {
         markup.setKeyboard(keyboard);
         markup.setResizeKeyboard(true);
 
-        // Отправка фото або тексту
-        if (photo != null && !photo.isEmpty()) {
+        // 🖼️ Відправка
+        if (photo != null && !photo.isEmpty() && !"null".equalsIgnoreCase(photo)) {
             sendPhotoFromResources(chatId.toString(), photo, sb.toString(), markup);
         } else {
             sendTextWithMarkup(chatId, sb.toString(), markup);
         }
 
-        // Збільшуємо індекс для кнопки "➡ Далі"
+        // 🔁 Зберігаємо індекс
         index = (index + 1) % products.size();
         productIndex.put(chatId, index);
+
+        System.out.println("DEBUG: Product index updated to " + index);
     }
 
     private void sendPhoto(String chatId, String fileName, String caption) {
