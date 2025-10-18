@@ -207,7 +207,7 @@ public class StoreBot extends TelegramLongPollingBot {
                         e.printStackTrace();
                     }
                 }
-                case "🛒 Перейти в кошик" -> {
+                case "🛍️ Перейти в кошик" -> {
                     try {
                         showCart(userId);  // userId — Long
                     } catch (TelegramApiException e) {
@@ -904,7 +904,7 @@ public class StoreBot extends TelegramLongPollingBot {
         KeyboardRow row = new KeyboardRow();
         row.add("➡ Далі");
         row.add("🛒 Додати в кошик");
-        row.add("🛒 Перейти в кошик");
+        row.add("🛍️ Перейти в кошик");
 
         List<KeyboardRow> keyboard = new ArrayList<>();
         keyboard.add(row);
@@ -2684,7 +2684,7 @@ public class StoreBot extends TelegramLongPollingBot {
         KeyboardRow row1 = new KeyboardRow();
         row1.add("➡ Далі");
         row1.add("🛒 Додати в кошик");
-        row1.add("🛒 Перейти в кошик");
+        row1.add("🛍️ Перейти в кошик");
 
         KeyboardRow row2 = new KeyboardRow();
         row2.add("⬅ Назад");
