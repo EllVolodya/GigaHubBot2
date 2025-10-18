@@ -93,6 +93,12 @@ public class StoreBot extends TelegramLongPollingBot {
             return;
         }
 
+        if ("waiting_for_action".equals(state)) {
+            // 🔹 Обробляємо кнопки через handleButtonPress
+            handleButtonPress(userId, chatId, text);
+            return; // виходимо, щоб не оброблялось як звичайна команда
+        }
+
         // 🔹 Якщо користувач у стані – передаємо в handleState
         if (state != null) {
             try {
@@ -684,10 +690,6 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
 
                 default -> handleText(userId, text);
-            }
-
-            if ("waiting_for_action".equals(state)) {
-                handleButtonPress(userId, chatId, text);
             }
 
             // Якщо користувач пише відгук
