@@ -1816,17 +1816,13 @@ public class StoreBot extends TelegramLongPollingBot {
     private void handleWaitingForSearch(Long userId, String chatId, String text) {
         text = text.trim();
 
-        // 🔹 Якщо користувач натиснув кнопку після перегляду товару
-        Map<String, Object> lastProduct = lastShownProduct.get(Long.parseLong(chatId));
-        if (lastProduct != null) {
-            switch (text) {
-                case "🛠 Додати в кошик", "🛒 Переглянути кошик", "🔙 Назад":
-                    handleButtonPress(userId, chatId, text); // обробка кнопки без повторного пошуку
-                    return;
-            }
+        // 🔹 Якщо натиснута кнопка, обробляємо її і виходимо
+        if (text.equals("🛠 Додати в кошик") || text.equals("🛒 Переглянути кошик") || text.equals("🔙 Назад")) {
+            handleButtonPress(userId, chatId, text);
+            return; // не робимо пошук
         }
 
-        // 1️⃣ Перевіряємо, чи текст — це число (вибір товару з попереднього списку)
+        // 🔹 Перевірка числа для вибору товару
         if (text.matches("\\d+")) {
             List<Map<String, Object>> products = searchResults.get(Long.parseLong(chatId));
             if (products != null) {
@@ -1835,7 +1831,7 @@ public class StoreBot extends TelegramLongPollingBot {
                     Map<String, Object> product = products.get(index);
                     lastShownProduct.put(Long.parseLong(chatId), product);
                     sendProductDetailsWithButtons(chatId, product);
-                    searchResults.remove(Long.parseLong(chatId)); // очищаємо список після вибору
+                    searchResults.remove(Long.parseLong(chatId));
                     return;
                 } else {
                     sendText(chatId, "⚠️ Неправильний номер товару. Спробуйте ще раз.");
@@ -1844,42 +1840,39 @@ public class StoreBot extends TelegramLongPollingBot {
             }
         }
 
-        // 2️⃣ Якщо текст не число — виконуємо пошук по назві
-        if (text.isEmpty()) {
-            sendText(chatId, "⚠️ Введіть назву товару для пошуку.");
-            return;
-        }
+        // 🔹 Пошук по назві
+        if (!text.isEmpty()) {
+            try {
+                CatalogSearcher searcher = new CatalogSearcher();
+                List<Map<String, Object>> foundProducts = searcher.searchMixedFromYAML(text);
 
-        try {
-            CatalogSearcher searcher = new CatalogSearcher();
-            List<Map<String, Object>> foundProducts = searcher.searchMixedFromYAML(text);
-
-            if (foundProducts.isEmpty()) {
-                // 🔹 Тут більше не показуємо "Товар не знайдено", просто нічого не відправляємо
-                return;
-            }
-
-            if (foundProducts.size() > 1) {
-                StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів:\n\n");
-                int idx = 1;
-                for (Map<String, Object> p : foundProducts) {
-                    sb.append(idx++).append(". ").append(p.get("name")).append("\n");
+                if (foundProducts.isEmpty()) {
+                    // 🔹 більше не пишемо "Товар не знайдено"
+                    return;
                 }
-                sb.append("\nВведіть номер товару, щоб побачити деталі.");
 
-                searchResults.put(Long.parseLong(chatId), foundProducts);
-                sendText(chatId, sb.toString());
-                return;
+                if (foundProducts.size() > 1) {
+                    StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів:\n\n");
+                    int idx = 1;
+                    for (Map<String, Object> p : foundProducts) {
+                        sb.append(idx++).append(". ").append(p.get("name")).append("\n");
+                    }
+                    sb.append("\nВведіть номер товару, щоб побачити деталі.");
+                    searchResults.put(Long.parseLong(chatId), foundProducts);
+                    sendText(chatId, sb.toString());
+                    return;
+                }
+
+                Map<String, Object> product = foundProducts.get(0);
+                lastShownProduct.put(Long.parseLong(chatId), product);
+                sendProductDetailsWithButtons(chatId, product);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                sendText(chatId, "⚠️ Помилка під час пошуку товару.");
             }
-
-            // Якщо один товар
-            Map<String, Object> product = foundProducts.get(0);
-            lastShownProduct.put(Long.parseLong(chatId), product);
-            sendProductDetailsWithButtons(chatId, product);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            sendText(chatId, "⚠️ Помилка під час пошуку товару.");
+        } else {
+            sendText(chatId, "⚠️ Введіть назву товару для пошуку.");
         }
     }
 
