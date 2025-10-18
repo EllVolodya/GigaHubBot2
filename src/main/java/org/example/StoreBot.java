@@ -208,6 +208,11 @@ public class StoreBot extends TelegramLongPollingBot {
                         e.printStackTrace();
                     }
                 }
+
+                case "➕ Додати в кошик" -> handleButtonPress(userId, chatId, text);
+                case "🛍 Переглянути кошик" -> handleButtonPress(userId, chatId, text);
+                case "🔙 Назад" -> handleButtonPress(userId, chatId, text);
+
                 case "🧹 Очистити кошик" -> clearCart(userId);
                 case "⬅ Назад", "⬅️ Назад" -> {
                     clearUserState(userId);
@@ -1775,11 +1780,11 @@ public class StoreBot extends TelegramLongPollingBot {
         List<KeyboardRow> keyboard = new ArrayList<>();
 
         KeyboardRow row1 = new KeyboardRow();
-        row1.add("🛒 Додати в кошик");
+        row1.add("➕ Додати в кошик");
         keyboard.add(row1);
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add("🛍️ Перейти в кошик");
+        row2.add("🛍 Переглянути кошик");
         keyboard.add(row2);
 
         KeyboardRow row3 = new KeyboardRow();
@@ -1807,33 +1812,13 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
     private void handleWaitingForSearch(Long userId, String chatId, String text) {
+        String query = text.trim();
+        if (query.isEmpty()) {
+            sendText(chatId, "⚠️ Введіть назву товару для пошуку.");
+            return;
+        }
+
         try {
-            // 🔹 Перевірка кнопок
-            switch (text) {
-                case "🛒 Додати в кошик" -> {
-                    // Викликаємо addToCart з одним аргументом chatId
-                    addToCart(Long.parseLong(chatId));
-                    return;
-                }
-                case "🛍️ Перейти в кошик" -> {
-                    // Викликаємо showCart з одним аргументом userId
-                    showCart(userId);
-                    return;
-                }
-                case "🔙 Назад" -> {
-                    // Викликаємо createUserMenu з одним аргументом chatId
-                    createUserMenu(chatId, userId);
-                    return;
-                }
-            }
-
-            // 🔹 Якщо це не кнопка — робимо пошук
-            String query = text.trim();
-            if (query.isEmpty()) {
-                sendText(chatId, "⚠️ Введіть назву товару для пошуку.");
-                return;
-            }
-
             CatalogSearcher searcher = new CatalogSearcher();
             List<Map<String, Object>> foundProducts = searcher.searchMixedFromYAML(query);
 
@@ -1842,7 +1827,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            // 🔹 Якщо більше одного товару
+            // 🟢 Якщо знайдено більше одного товару, показуємо список
             if (foundProducts.size() > 1) {
                 StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів:\n\n");
                 int index = 1;
@@ -1856,9 +1841,9 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            // 🔹 Якщо один товар — показуємо деталі з кнопками
+            // 🟢 Якщо знайдено один товар — показуємо деталі з кнопками
             Map<String, Object> product = foundProducts.get(0);
-            lastShownProduct.put(Long.parseLong(chatId), product);
+            lastShownProduct.put(Long.parseLong(chatId), product); // зберігаємо для кнопки "Додати в кошик"
 
             String message = String.format(
                     "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Якщо бажаєте, введіть інший товар для пошуку або натисніть 'Назад' для повернення в головне меню.",
@@ -1868,7 +1853,7 @@ public class StoreBot extends TelegramLongPollingBot {
                     product.get("subcategory")
             );
 
-            // 🔹 Клавіатура
+            // 🔹 Створюємо клавіатуру через KeyboardRow
             ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
             keyboardMarkup.setResizeKeyboard(true);
             keyboardMarkup.setOneTimeKeyboard(false);
@@ -3168,7 +3153,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
     private void handleButtonPress(Long userId, String chatId, String text) {
         switch (text) {
-            case "🛒 Додати в кошик":
+            case "➕ Додати в кошик":
                 Map<String, Object> product = lastShownProduct.get(userId);
                 if (product == null) {
                     sendText(chatId, "❌ Неможливо додати товар. Спробуйте ще раз.");
@@ -3178,7 +3163,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 sendText(chatId, "✅ Товар \"" + product.get("name") + "\" додано до кошика!\n🔎 Якщо бажаєте продовжити покупки, введіть назву наступного товару.");
                 break;
 
-            case "🛍️ Перейти в кошик":
+            case "\uD83D\uDECD Переглянути кошик":
                 try {
                     showCart(userId); // тепер тільки userId
                 } catch (TelegramApiException e) {
