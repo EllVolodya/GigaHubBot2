@@ -1807,13 +1807,33 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
     private void handleWaitingForSearch(Long userId, String chatId, String text) {
-        String query = text.trim();
-        if (query.isEmpty()) {
-            sendText(chatId, "⚠️ Введіть назву товару для пошуку.");
-            return;
-        }
-
         try {
+            // 🔹 Перевірка кнопок
+            switch (text) {
+                case "🛒 Додати в кошик" -> {
+                    // Викликаємо addToCart з одним аргументом chatId
+                    addToCart(Long.parseLong(chatId));
+                    return;
+                }
+                case "🛍️ Перейти в кошик" -> {
+                    // Викликаємо showCart з одним аргументом userId
+                    showCart(userId);
+                    return;
+                }
+                case "🔙 Назад" -> {
+                    // Викликаємо createUserMenu з одним аргументом chatId
+                    createUserMenu(chatId, userId);
+                    return;
+                }
+            }
+
+            // 🔹 Якщо це не кнопка — робимо пошук
+            String query = text.trim();
+            if (query.isEmpty()) {
+                sendText(chatId, "⚠️ Введіть назву товару для пошуку.");
+                return;
+            }
+
             CatalogSearcher searcher = new CatalogSearcher();
             List<Map<String, Object>> foundProducts = searcher.searchMixedFromYAML(query);
 
@@ -1822,6 +1842,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
+            // 🔹 Якщо більше одного товару
             if (foundProducts.size() > 1) {
                 StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів:\n\n");
                 int index = 1;
@@ -1830,14 +1851,14 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
                 sb.append("\nВведіть номер товару, щоб побачити деталі.");
 
-                searchResults.put(userId, foundProducts);
+                searchResults.put(Long.parseLong(chatId), foundProducts);
                 sendText(chatId, sb.toString());
                 return;
             }
 
-            // Один товар — показуємо деталі з кнопками
+            // 🔹 Якщо один товар — показуємо деталі з кнопками
             Map<String, Object> product = foundProducts.get(0);
-            lastShownProduct.put(userId, product); // зберігаємо для кнопки "Додати в кошик"
+            lastShownProduct.put(Long.parseLong(chatId), product);
 
             String message = String.format(
                     "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Якщо бажаєте, введіть інший товар для пошуку або натисніть 'Назад' для повернення в головне меню.",
@@ -1847,12 +1868,13 @@ public class StoreBot extends TelegramLongPollingBot {
                     product.get("subcategory")
             );
 
-            // Клавіатура
+            // 🔹 Клавіатура
             ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
             keyboardMarkup.setResizeKeyboard(true);
             keyboardMarkup.setOneTimeKeyboard(false);
 
             List<KeyboardRow> keyboard = new ArrayList<>();
+
             KeyboardRow row1 = new KeyboardRow();
             row1.add("🛒 Додати в кошик");
             keyboard.add(row1);
@@ -1872,7 +1894,7 @@ public class StoreBot extends TelegramLongPollingBot {
             sendMessage.setText(message);
             sendMessage.setReplyMarkup(keyboardMarkup);
 
-            execute(sendMessage);
+            execute(sendMessage); // відправляємо повідомлення
 
         } catch (Exception e) {
             e.printStackTrace();
