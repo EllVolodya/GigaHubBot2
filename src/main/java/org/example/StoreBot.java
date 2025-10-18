@@ -1742,7 +1742,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
         int selectedIndex;
         try {
-            selectedIndex = Integer.parseInt(text.trim()) - 1; // користувач вводить 1-based номер
+            selectedIndex = Integer.parseInt(text.trim()) - 1;
         } catch (NumberFormatException e) {
             sendText(chatId, "⚠️ Будь ласка, введіть правильний номер товару.");
             return;
@@ -1754,11 +1754,52 @@ public class StoreBot extends TelegramLongPollingBot {
         }
 
         Map<String, Object> selectedProduct = products.get(selectedIndex);
-        String message = selectedProduct.get("text").toString();
 
-        sendText(chatId, message);
+        String message = String.format(
+                "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Якщо бажаєте, введіть інший товар для пошуку або натисніть 'Назад' для повернення в головне меню.",
+                selectedProduct.get("name"),
+                selectedProduct.get("price"),
+                selectedProduct.get("category"),
+                selectedProduct.get("subcategory")
+        );
+
+        // 🔹 Створюємо клавіатуру через KeyboardRow
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        keyboardMarkup.setResizeKeyboard(true);
+        keyboardMarkup.setOneTimeKeyboard(false);
+
+        List<KeyboardRow> keyboard = new ArrayList<>();
+
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add("🛒 Додати в кошик");
+        keyboard.add(row1);
+
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add("🛍️ Перейти в кошик");
+        keyboard.add(row2);
+
+        KeyboardRow row3 = new KeyboardRow();
+        row3.add("🔙 Назад");
+        keyboard.add(row3);
+
+        keyboardMarkup.setKeyboard(keyboard);
+
+        // Відправка повідомлення з кнопками
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(chatId);
+        sendMessage.setText(message);
+        sendMessage.setReplyMarkup(keyboardMarkup);
+
+        try {
+            execute(sendMessage);
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendText(chatId, "⚠️ Помилка при відправці повідомлення.");
+        }
+
+        // Очищуємо тимчасові дані
         userStates.remove(userId);
-        searchResults.remove(Long.parseLong(chatId)); // очищаємо результати після вибору
+        searchResults.remove(Long.parseLong(chatId));
     }
 
     private void handleWaitingForSearch(Long userId, String chatId, String text) {
@@ -1770,6 +1811,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
         try {
             CatalogSearcher searcher = new CatalogSearcher();
+            // Пошук у YAML + MySQL
             List<Map<String, Object>> foundProducts = searcher.searchMixedFromYAML(query);
 
             if (foundProducts.isEmpty()) {
@@ -1783,8 +1825,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів:\n\n");
                 int index = 1;
                 for (Map<String, Object> p : foundProducts) {
-                    String textLine = p.get("text").toString();
-                    sb.append(index++).append(". ").append(textLine.split("\n")[0].substring(2)).append("\n");
+                    sb.append(index++).append(". ").append(p.get("name")).append("\n");
                 }
                 sb.append("\nВведіть номер товару, щоб побачити деталі.");
 
@@ -1794,8 +1835,44 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            // 🟢 Якщо знайдено один товар — показуємо повну інформацію
-            sendText(chatId, foundProducts.get(0).get("text").toString());
+            // 🟢 Якщо знайдено один товар — показуємо деталі з кнопками
+            Map<String, Object> product = foundProducts.get(0);
+            String message = String.format(
+                    "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Якщо бажаєте, введіть інший товар для пошуку або натисніть 'Назад' для повернення в головне меню.",
+                    product.get("name"),
+                    product.get("price"),
+                    product.get("category"),
+                    product.get("subcategory")
+            );
+
+            // 🔹 Створюємо клавіатуру через KeyboardRow
+            ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+            keyboardMarkup.setResizeKeyboard(true);
+            keyboardMarkup.setOneTimeKeyboard(false);
+
+            List<KeyboardRow> keyboard = new ArrayList<>();
+
+            KeyboardRow row1 = new KeyboardRow();
+            row1.add("🛒 Додати в кошик");
+            keyboard.add(row1);
+
+            KeyboardRow row2 = new KeyboardRow();
+            row2.add("🛍️ Перейти в кошик");
+            keyboard.add(row2);
+
+            KeyboardRow row3 = new KeyboardRow();
+            row3.add("🔙 Назад");
+            keyboard.add(row3);
+
+            keyboardMarkup.setKeyboard(keyboard);
+
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(chatId);
+            sendMessage.setText(message);
+            sendMessage.setReplyMarkup(keyboardMarkup);
+
+            execute(sendMessage); // відправляємо повідомлення
+
             userStates.remove(userId);
 
         } catch (Exception e) {
