@@ -75,13 +75,14 @@ public class StoreBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (!update.hasMessage()) return;
+        if (!update.hasMessage() || !update.getMessage().hasText()) return;
 
         Long userId = update.getMessage().getFrom().getId();
         String chatId = update.getMessage().getChatId().toString();
+        String text = update.getMessage().getText().trim();
         String state = userStates.get(userId);
-        String text = update.getMessage().hasText() ? update.getMessage().getText().trim() : null;
 
+        // 🔹 Обробка станів з фото
         if ("awaiting_photo".equals(state)) {
             if (update.getMessage().hasPhoto()) {
                 List<PhotoSize> photos = update.getMessage().getPhoto();
@@ -1811,8 +1812,19 @@ public class StoreBot extends TelegramLongPollingBot {
         searchResults.remove(Long.parseLong(chatId));
     }
 
+    //Пошук товару по назві
     private void handleWaitingForSearch(Long userId, String chatId, String text) {
         text = text.trim();
+
+        // 🔹 Якщо користувач натиснув кнопку після перегляду товару
+        Map<String, Object> lastProduct = lastShownProduct.get(Long.parseLong(chatId));
+        if (lastProduct != null) {
+            switch (text) {
+                case "🛠 Додати в кошик", "🛒 Переглянути кошик", "🔙 Назад":
+                    handleButtonPress(userId, chatId, text); // обробка кнопки без повторного пошуку
+                    return;
+            }
+        }
 
         // 1️⃣ Перевіряємо, чи текст — це число (вибір товару з попереднього списку)
         if (text.matches("\\d+")) {
@@ -1843,7 +1855,7 @@ public class StoreBot extends TelegramLongPollingBot {
             List<Map<String, Object>> foundProducts = searcher.searchMixedFromYAML(text);
 
             if (foundProducts.isEmpty()) {
-                sendText(chatId, "❌ Товар не знайдено. Спробуйте інший запит.");
+                // 🔹 Тут більше не показуємо "Товар не знайдено", просто нічого не відправляємо
                 return;
             }
 
