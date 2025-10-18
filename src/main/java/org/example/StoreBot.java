@@ -1837,6 +1837,8 @@ public class StoreBot extends TelegramLongPollingBot {
 
             // 🟢 Якщо знайдено один товар — показуємо деталі з кнопками
             Map<String, Object> product = foundProducts.get(0);
+            lastShownProduct.put(Long.parseLong(chatId), product); // зберігаємо для кнопки "Додати в кошик"
+
             String message = String.format(
                     "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Якщо бажаєте, введіть інший товар для пошуку або натисніть 'Назад' для повернення в головне меню.",
                     product.get("name"),
@@ -1845,7 +1847,7 @@ public class StoreBot extends TelegramLongPollingBot {
                     product.get("subcategory")
             );
 
-            // 🔹 Створюємо клавіатуру через KeyboardRow
+            // 🔹 Клавіатура через KeyboardRow
             ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
             keyboardMarkup.setResizeKeyboard(true);
             keyboardMarkup.setOneTimeKeyboard(false);
@@ -1873,7 +1875,8 @@ public class StoreBot extends TelegramLongPollingBot {
 
             execute(sendMessage); // відправляємо повідомлення
 
-            userStates.remove(userId);
+            // Стан користувача можна залишити як "waiting_for_action", бо він вибирає через кнопки
+            userStates.put(userId, "waiting_for_action");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -3143,6 +3146,37 @@ public class StoreBot extends TelegramLongPollingBot {
         } catch (Exception e) {
             e.printStackTrace();
             sendText(chatId, "❌ Сталася помилка при відправленні фото.");
+        }
+    }
+
+    private void handleButtonPress(Long userId, String chatId, String text) {
+        switch (text) {
+            case "🛒 Додати в кошик":
+                try {
+                    addToCart(userId); // твій метод, який бере останній товар із lastShownProduct і додає в кошик
+                    sendText(chatId, "🔎 Якщо бажаєте продовжити покупки, введіть назву наступного товару.");
+                    userStates.put(userId, "waiting_for_search");
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "⚠️ Не вдалося додати товар у кошик. Спробуйте ще раз.");
+                }
+                return;
+
+            case "🛍️ Перейти в кошик":
+                try {
+                    showCart(userId);
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "⚠️ Не вдалося показати кошик.");
+                }
+                return;
+
+            case "🔙 Назад":
+                createUserMenu(chatId, userId);
+                return;
+
+            default:
+                sendText(chatId, "⚠️ Невідома кнопка.");
         }
     }
 
