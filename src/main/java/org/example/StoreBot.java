@@ -1820,6 +1820,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
         try {
             CatalogSearcher searcher = new CatalogSearcher();
+            // Пошук у YAML + MySQL
             List<Map<String, Object>> foundProducts = searcher.searchMixedFromYAML(query);
 
             if (foundProducts.isEmpty()) {
@@ -1827,7 +1828,7 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            // 🟢 Якщо знайдено більше одного товару, показуємо список
+            // Якщо знайдено більше одного товару — показуємо список
             if (foundProducts.size() > 1) {
                 StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів:\n\n");
                 int index = 1;
@@ -1841,50 +1842,52 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            // 🟢 Якщо знайдено один товар — показуємо деталі з кнопками
+            // Якщо знайдено один товар — показуємо деталі з кнопками
             Map<String, Object> product = foundProducts.get(0);
-            lastShownProduct.put(Long.parseLong(chatId), product); // зберігаємо для кнопки "Додати в кошик"
-
-            String message = String.format(
-                    "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Якщо бажаєте, введіть інший товар для пошуку або натисніть 'Назад' для повернення в головне меню.",
-                    product.get("name"),
-                    product.get("price"),
-                    product.get("category"),
-                    product.get("subcategory")
-            );
-
-            // 🔹 Створюємо клавіатуру через KeyboardRow
-            ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-            keyboardMarkup.setResizeKeyboard(true);
-            keyboardMarkup.setOneTimeKeyboard(false);
-
-            List<KeyboardRow> keyboard = new ArrayList<>();
-
-            KeyboardRow row1 = new KeyboardRow();
-            row1.add("🛒 Додати в кошик");
-            keyboard.add(row1);
-
-            KeyboardRow row2 = new KeyboardRow();
-            row2.add("🛍️ Перейти в кошик");
-            keyboard.add(row2);
-
-            KeyboardRow row3 = new KeyboardRow();
-            row3.add("🔙 Назад");
-            keyboard.add(row3);
-
-            keyboardMarkup.setKeyboard(keyboard);
-
-            SendMessage sendMessage = new SendMessage();
-            sendMessage.setChatId(chatId);
-            sendMessage.setText(message);
-            sendMessage.setReplyMarkup(keyboardMarkup);
-
-            execute(sendMessage); // відправляємо повідомлення
+            lastShownProduct.put(Long.parseLong(chatId), product);
+            sendProductDetails(chatId, product); // Відправка деталей з кнопками
 
         } catch (Exception e) {
             e.printStackTrace();
             sendText(chatId, "⚠️ Помилка під час пошуку товару.");
         }
+    }
+
+    private void sendProductDetails(String chatId, Map<String, Object> product) throws TelegramApiException {
+        String message = String.format(
+                "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Якщо бажаєте, введіть інший товар для пошуку або натисніть 'Назад' для повернення в головне меню.",
+                product.get("name"),
+                product.get("price"),
+                product.get("category"),
+                product.get("subcategory")
+        );
+
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        keyboardMarkup.setResizeKeyboard(true);
+        keyboardMarkup.setOneTimeKeyboard(false);
+
+        List<KeyboardRow> keyboard = new ArrayList<>();
+
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add("➕ Додати в кошик");
+        keyboard.add(row1);
+
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add("🛍 Переглянути кошик");
+        keyboard.add(row2);
+
+        KeyboardRow row3 = new KeyboardRow();
+        row3.add("🔙 Назад");
+        keyboard.add(row3);
+
+        keyboardMarkup.setKeyboard(keyboard);
+
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(chatId);
+        sendMessage.setText(message);
+        sendMessage.setReplyMarkup(keyboardMarkup);
+
+        execute(sendMessage);
     }
 
     // ✏️ Початок редагування товару для адміна
