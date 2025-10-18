@@ -739,7 +739,7 @@ public class StoreBot extends TelegramLongPollingBot {
 
     // --- Категорії з MySQL ---
     private void sendCategories(Long chatId) throws TelegramApiException {
-        CatalogSearcher searcher = new CatalogSearcher(); // створюємо новий пошуковик
+        CatalogSearcher searcher = new CatalogSearcher();
 
         List<String> categories = searcher.getCategories();
         if (categories.isEmpty()) {
@@ -753,6 +753,8 @@ public class StoreBot extends TelegramLongPollingBot {
                 .build();
 
         sendMessage(chatId, "📂 Виберіть категорію:", markup);
+
+        System.out.println("DEBUG: Categories sent in ID order: " + categories);
     }
 
     // 🔹 Показ кошика

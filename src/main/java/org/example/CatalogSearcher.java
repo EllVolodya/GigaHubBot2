@@ -93,7 +93,7 @@ public class CatalogSearcher {
     // ---------------- Категорії ----------------
     public List<String> getCategories() {
         List<String> categories = new ArrayList<>();
-        String sql = "SELECT name FROM categories ORDER BY name;";
+        String sql = "SELECT name FROM categories ORDER BY id ASC";
 
         try (Connection conn = DatabaseManager.getConnection();
              Statement stmt = conn.createStatement();
