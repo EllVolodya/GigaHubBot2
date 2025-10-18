@@ -136,27 +136,57 @@ public class CatalogSearcher {
     // ---------------- Продукти ----------------
     public List<Map<String, Object>> getProducts(String categoryName, String subcategoryName) {
         List<Map<String, Object>> products = new ArrayList<>();
+
         String sql = """
-            SELECT p.*, s.name AS subcategory, c.name AS category
-            FROM products p
-            JOIN subcategories s ON p.subcategory_id = s.id
-            JOIN categories c ON s.category_id = c.id
-            WHERE c.name = ? AND s.name = ?
-            ORDER BY p.name;
-        """;
+        SELECT p.id, p.name, p.price, p.unit, p.description, p.photo, p.manufacturer,
+               s.name AS subcategory, c.name AS category
+        FROM products p
+        JOIN subcategories s ON p.subcategory_id = s.id
+        JOIN categories c ON s.category_id = c.id
+        WHERE c.name = ? AND s.name = ?
+        ORDER BY p.id;
+    """;
 
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, categoryName);
             stmt.setString(2, subcategoryName);
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) products.add(mapProduct(rs));
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> product = new HashMap<>();
+                    product.put("id", rs.getInt("id"));
+                    product.put("name", rs.getString("name"));
+                    product.put("price", rs.getObject("price"));
+                    product.put("unit", rs.getString("unit"));
+                    product.put("description", rs.getString("description"));
+                    product.put("photo", rs.getString("photo"));
+                    product.put("subcategory", rs.getString("subcategory"));
+                    product.put("category", rs.getString("category"));
+
+                    // 🏭 Обробка manufacturer
+                    Object manufacturerObj = rs.getObject("manufacturer");
+                    String manufacturer = "";
+                    if (manufacturerObj instanceof byte[] bytes) {
+                        manufacturer = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+                    } else if (manufacturerObj != null) {
+                        manufacturer = manufacturerObj.toString();
+                    }
+                    product.put("manufacturer", manufacturer);
+
+                    products.add(product);
+
+                    System.out.println("DEBUG: Loaded product '" + rs.getString("name") + "', manufacturer='" + manufacturer + "'");
+                }
+            }
 
         } catch (SQLException e) {
+            System.err.println("❌ getProducts SQL error: " + e.getMessage());
             e.printStackTrace();
         }
 
+        System.out.println("DEBUG: getProducts() -> found " + products.size() + " products for category=" + categoryName + ", subcategory=" + subcategoryName);
         return products;
     }
 

@@ -2517,7 +2517,7 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
-    // 🔹 Показ товару (оновлена стабільна версія)
+    // 🔹 Показ товару
     private void sendProduct(Long chatId) throws TelegramApiException {
         String category = currentCategory.get(chatId);
         String subcategory = currentSubcategory.get(chatId);
