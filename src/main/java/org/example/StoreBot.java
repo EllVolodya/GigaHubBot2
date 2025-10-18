@@ -2515,13 +2515,14 @@ public class StoreBot extends TelegramLongPollingBot {
         }
     }
 
-    // 🔹 Показ товару
+    // 🔹 Показ товару (оновлена стабільна версія)
     private void sendProduct(Long chatId) throws TelegramApiException {
         String category = currentCategory.get(chatId);
         String subcategory = currentSubcategory.get(chatId);
 
-        System.out.println("DEBUG: sendProduct() called for chatId=" + chatId);
-        System.out.println("DEBUG: Category=" + category + ", Subcategory=" + subcategory);
+        System.out.println("\n==============================");
+        System.out.println("DEBUG: sendProduct() called for chatId = " + chatId);
+        System.out.println("DEBUG: Category = " + category + ", Subcategory = " + subcategory);
 
         int index = productIndex.getOrDefault(chatId, 0);
 
@@ -2530,10 +2531,11 @@ public class StoreBot extends TelegramLongPollingBot {
 
         if (products == null || products.isEmpty()) {
             sendText(chatId, "❌ У цій підкатегорії немає товарів.");
-            System.out.println("DEBUG: No products found for category=" + category + ", subcategory=" + subcategory);
+            System.out.println("DEBUG: No products found for category = " + category + ", subcategory = " + subcategory);
             return;
         }
 
+        // 🔢 Сортуємо товари по id
         products.sort(Comparator.comparingInt(p -> ((Number) p.get("id")).intValue()));
 
         if (index >= products.size() || index < 0) index = 0;
@@ -2541,62 +2543,85 @@ public class StoreBot extends TelegramLongPollingBot {
         Map<String, Object> product = products.get(index);
         lastShownProduct.put(chatId, product);
 
-        // 🧩 Безпечне читання значень
-        String name = String.valueOf(product.getOrDefault("name", "Без назви"));
-        String price = String.valueOf(product.getOrDefault("price", "N/A"));
-        String unit = String.valueOf(product.getOrDefault("unit", "шт"));
-        String description = String.valueOf(product.getOrDefault("description", ""));
-        String photo = String.valueOf(product.getOrDefault("photo", ""));
-        String manufacturer = "";
+        // 🧩 Безпечне читання даних із мапи
+        String name = safeToString(product.get("name"), "Без назви");
+        String price = safeToString(product.get("price"), "N/A");
+        String unit = safeToString(product.get("unit"), "шт");
+        String description = safeToString(product.get("description"), "");
+        String photo = safeToString(product.get("photo"), "");
 
-        // Якщо виробник збережений як BLOB
+        // 🏭 Виробник — з урахуванням можливого типу BLOB або Blob
+        String manufacturer = "";
         Object manufacturerObj = product.get("manufacturer");
-        if (manufacturerObj instanceof byte[] bytes) {
-            manufacturer = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
-        } else if (manufacturerObj != null) {
-            manufacturer = String.valueOf(manufacturerObj);
+        try {
+            if (manufacturerObj instanceof byte[] bytes) {
+                manufacturer = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+            } else if (manufacturerObj instanceof java.sql.Blob blob) {
+                manufacturer = new String(blob.getBytes(1, (int) blob.length()), java.nio.charset.StandardCharsets.UTF_8);
+            } else if (manufacturerObj != null) {
+                manufacturer = String.valueOf(manufacturerObj);
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error reading manufacturer: " + e.getMessage());
         }
 
         System.out.println("DEBUG: Showing product -> " + name);
         System.out.println("DEBUG: Manufacturer = " + manufacturer);
         System.out.println("DEBUG: Photo = " + photo);
+        System.out.println("DEBUG: Description = " + description);
+        System.out.println("DEBUG: Price = " + price + ", Unit = " + unit);
 
         // 🧾 Формування повідомлення
         StringBuilder sb = new StringBuilder("📦 ").append(name)
                 .append("\n💰 Ціна: ").append(price).append(" грн за ").append(unit);
 
-        if (!manufacturer.isEmpty() && !"null".equalsIgnoreCase(manufacturer))
+        if (!manufacturer.isEmpty() && !"null".equalsIgnoreCase(manufacturer.trim())) {
             sb.append("\n🏭 Виробник: ").append(manufacturer);
+        }
 
-        if (!description.isEmpty() && !"null".equalsIgnoreCase(description))
+        if (!description.isEmpty() && !"null".equalsIgnoreCase(description.trim())) {
             sb.append("\n📖 ").append(description);
+        }
 
         // 🧭 Кнопки
-        KeyboardRow row = new KeyboardRow();
-        row.add("➡ Далі");
-        row.add("🛒 Додати в кошик");
-        row.add("🛒 Перейти в кошик");
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add("➡ Далі");
+        row1.add("🛒 Додати в кошик");
+        row1.add("🛒 Перейти в кошик");
+
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add("⬅ Назад");
 
         List<KeyboardRow> keyboard = new ArrayList<>();
-        keyboard.add(row);
-        keyboard.add(new KeyboardRow(List.of(new KeyboardButton("⬅ Назад"))));
+        keyboard.add(row1);
+        keyboard.add(row2);
 
         ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
         markup.setKeyboard(keyboard);
         markup.setResizeKeyboard(true);
 
-        // 🖼️ Відправка
-        if (photo != null && !photo.isEmpty() && !"null".equalsIgnoreCase(photo)) {
+        // 🖼️ Відправка контенту
+        if (photo != null && !photo.isEmpty() && !"null".equalsIgnoreCase(photo.trim())) {
             sendPhotoFromResources(chatId.toString(), photo, sb.toString(), markup);
+            System.out.println("DEBUG: Sent product with photo");
         } else {
             sendTextWithMarkup(chatId, sb.toString(), markup);
+            System.out.println("DEBUG: Sent product without photo");
         }
 
-        // 🔁 Зберігаємо індекс
+        // 🔁 Оновлюємо індекс для наступного товару
         index = (index + 1) % products.size();
         productIndex.put(chatId, index);
 
         System.out.println("DEBUG: Product index updated to " + index);
+        System.out.println("==============================\n");
+    }
+
+    // 🔸 Допоміжний метод — безпечне перетворення в String
+    private String safeToString(Object value, String defaultValue) {
+        if (value == null) return defaultValue;
+        String str = String.valueOf(value);
+        return ("null".equalsIgnoreCase(str)) ? defaultValue : str;
     }
 
     private void sendPhoto(String chatId, String fileName, String caption) {
