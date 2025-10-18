@@ -686,6 +686,10 @@ public class StoreBot extends TelegramLongPollingBot {
                 default -> handleText(userId, text);
             }
 
+            if ("waiting_for_action".equals(state)) {
+                handleButtonPress(userId, chatId, text);
+            }
+
             // Якщо користувач пише відгук
             if ("waiting_for_feedback".equals(state)) {
                 FeedbackManager.addFeedback(userId, text);
@@ -1875,7 +1879,8 @@ public class StoreBot extends TelegramLongPollingBot {
 
             execute(sendMessage); // відправляємо повідомлення
 
-            // Стан користувача можна залишити як "waiting_for_action", бо він вибирає через кнопки
+            // 🔹 Тепер стан користувача — "waiting_for_action"
+            // Кнопки будуть оброблятись через handleButtonPress в onUpdateReceived
             userStates.put(userId, "waiting_for_action");
 
         } catch (Exception e) {
@@ -3152,31 +3157,39 @@ public class StoreBot extends TelegramLongPollingBot {
     private void handleButtonPress(Long userId, String chatId, String text) {
         switch (text) {
             case "🛒 Додати в кошик":
-                try {
-                    addToCart(userId); // твій метод, який бере останній товар із lastShownProduct і додає в кошик
-                    sendText(chatId, "🔎 Якщо бажаєте продовжити покупки, введіть назву наступного товару.");
-                    userStates.put(userId, "waiting_for_search");
-                } catch (TelegramApiException e) {
-                    e.printStackTrace();
-                    sendText(chatId, "⚠️ Не вдалося додати товар у кошик. Спробуйте ще раз.");
+                // Отримуємо останній показаний товар
+                Map<String, Object> product = lastShownProduct.get(userId);
+
+                if (product == null) {
+                    sendText(chatId, "❌ Неможливо додати товар. Спробуйте ще раз.");
+                    return;
                 }
-                return;
+
+                // Додаємо товар у кошик користувача
+                userCart.computeIfAbsent(userId, k -> new ArrayList<>()).add(product);
+                sendText(chatId, "✅ Товар \"" + product.get("name") + "\" додано до кошика!\n🔎 Якщо бажаєте продовжити покупки, введіть назву наступного товару.");
+
+                // Стан залишається пошуку
+                userStates.put(userId, "waiting_for_search");
+                break;
 
             case "🛍️ Перейти в кошик":
                 try {
-                    showCart(userId);
+                    showCart(userId); // відправка кошика
                 } catch (TelegramApiException e) {
                     e.printStackTrace();
-                    sendText(chatId, "⚠️ Не вдалося показати кошик.");
+                    sendText(chatId, "⚠️ Помилка при показі кошика.");
                 }
-                return;
+                break;
 
             case "🔙 Назад":
-                createUserMenu(chatId, userId);
-                return;
+                createUserMenu(chatId, userId); // головне меню
+                userStates.remove(userId);
+                break;
 
             default:
                 sendText(chatId, "⚠️ Невідома кнопка.");
+                break;
         }
     }
 
