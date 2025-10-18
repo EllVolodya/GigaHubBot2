@@ -93,12 +93,6 @@ public class StoreBot extends TelegramLongPollingBot {
             return;
         }
 
-        if ("waiting_for_action".equals(state)) {
-            // 🔹 Обробляємо кнопки через handleButtonPress
-            handleButtonPress(userId, chatId, text);
-            return; // виходимо, щоб не оброблялось як звичайна команда
-        }
-
         // 🔹 Якщо користувач у стані – передаємо в handleState
         if (state != null) {
             try {
@@ -1821,16 +1815,13 @@ public class StoreBot extends TelegramLongPollingBot {
 
         try {
             CatalogSearcher searcher = new CatalogSearcher();
-            // Пошук у YAML + MySQL
             List<Map<String, Object>> foundProducts = searcher.searchMixedFromYAML(query);
 
             if (foundProducts.isEmpty()) {
                 sendText(chatId, "❌ Товар не знайдено. Спробуйте інший запит.");
-                userStates.remove(userId);
                 return;
             }
 
-            // 🟢 Якщо знайдено більше одного товару, показуємо список
             if (foundProducts.size() > 1) {
                 StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів:\n\n");
                 int index = 1;
@@ -1839,15 +1830,14 @@ public class StoreBot extends TelegramLongPollingBot {
                 }
                 sb.append("\nВведіть номер товару, щоб побачити деталі.");
 
-                searchResults.put(Long.parseLong(chatId), foundProducts);
-                userStates.put(userId, "waiting_for_product_number");
+                searchResults.put(userId, foundProducts);
                 sendText(chatId, sb.toString());
                 return;
             }
 
-            // 🟢 Якщо знайдено один товар — показуємо деталі з кнопками
+            // Один товар — показуємо деталі з кнопками
             Map<String, Object> product = foundProducts.get(0);
-            lastShownProduct.put(Long.parseLong(chatId), product); // зберігаємо для кнопки "Додати в кошик"
+            lastShownProduct.put(userId, product); // зберігаємо для кнопки "Додати в кошик"
 
             String message = String.format(
                     "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Якщо бажаєте, введіть інший товар для пошуку або натисніть 'Назад' для повернення в головне меню.",
@@ -1857,13 +1847,12 @@ public class StoreBot extends TelegramLongPollingBot {
                     product.get("subcategory")
             );
 
-            // 🔹 Клавіатура через KeyboardRow
+            // Клавіатура
             ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
             keyboardMarkup.setResizeKeyboard(true);
             keyboardMarkup.setOneTimeKeyboard(false);
 
             List<KeyboardRow> keyboard = new ArrayList<>();
-
             KeyboardRow row1 = new KeyboardRow();
             row1.add("🛒 Додати в кошик");
             keyboard.add(row1);
@@ -1883,16 +1872,11 @@ public class StoreBot extends TelegramLongPollingBot {
             sendMessage.setText(message);
             sendMessage.setReplyMarkup(keyboardMarkup);
 
-            execute(sendMessage); // відправляємо повідомлення
-
-            // 🔹 Тепер стан користувача — "waiting_for_action"
-            // Кнопки будуть оброблятись через handleButtonPress в onUpdateReceived
-            userStates.put(userId, "waiting_for_action");
+            execute(sendMessage);
 
         } catch (Exception e) {
             e.printStackTrace();
             sendText(chatId, "⚠️ Помилка під час пошуку товару.");
-            userStates.remove(userId);
         }
     }
 
@@ -3161,41 +3145,33 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
     private void handleButtonPress(Long userId, String chatId, String text) {
-        try {
-            switch (text) {
-                case "🛒 Додати в кошик" -> {
-                    // Беремо останній показаний товар
-                    Map<String, Object> product = lastShownProduct.get(Long.parseLong(chatId));
-                    if (product == null) {
-                        sendText(chatId, "❌ Неможливо додати товар. Спробуйте ще раз.");
-                        return;
-                    }
-
-                    // Додаємо у кошик
-                    userCart.computeIfAbsent(userId, k -> new ArrayList<>()).add(product);
-
-                    sendText(chatId, "✅ Ви успішно додали у кошик товар: " + product.get("name") +
-                            "\n🔎 Якщо бажаєте продовжити покупки, введіть назву наступного товару або натисніть 'Назад' для повернення в головне меню.");
-
-                    // Залишаємо стан "waiting_for_action", щоб користувач міг шукати далі
-                    userStates.put(userId, "waiting_for_action");
+        switch (text) {
+            case "🛒 Додати в кошик":
+                Map<String, Object> product = lastShownProduct.get(userId);
+                if (product == null) {
+                    sendText(chatId, "❌ Неможливо додати товар. Спробуйте ще раз.");
+                    return;
                 }
+                userCart.computeIfAbsent(userId, k -> new ArrayList<>()).add(product);
+                sendText(chatId, "✅ Товар \"" + product.get("name") + "\" додано до кошика!\n🔎 Якщо бажаєте продовжити покупки, введіть назву наступного товару.");
+                break;
 
-                case "🛍️ Перейти в кошик" -> {
-                    showCart(userId); // передаємо лише userId
-                    userStates.put(userId, "waiting_for_cart_action");
+            case "🛍️ Перейти в кошик":
+                try {
+                    showCart(userId); // тепер тільки userId
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                    sendText(chatId, "⚠️ Помилка при показі кошика.");
                 }
+                break;
 
-                case "🔙 Назад" -> {
-                    createUserMenu(chatId, userId); // повернення у головне меню
-                    userStates.remove(userId); // прибираємо стан
-                }
+            case "🔙 Назад":
+                createUserMenu(chatId, userId); // повернення в головне меню
+                break;
 
-                default -> sendText(chatId, "⚠️ Невідома кнопка. Будь ласка, скористайтесь клавіатурою нижче.");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            sendText(chatId, "⚠️ Сталася помилка при обробці кнопки.");
+            default:
+                // Якщо це не кнопка, перевіряємо чи це пошук
+                handleWaitingForSearch(userId, chatId, text);
         }
     }
 
