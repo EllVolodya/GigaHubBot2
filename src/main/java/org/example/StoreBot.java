@@ -1845,49 +1845,48 @@ public class StoreBot extends TelegramLongPollingBot {
             // Якщо знайдено один товар — показуємо деталі з кнопками
             Map<String, Object> product = foundProducts.get(0);
             lastShownProduct.put(Long.parseLong(chatId), product);
-            sendProductDetails(chatId, product); // Відправка деталей з кнопками
+
+            // 🔹 Формуємо повідомлення
+            String message = String.format(
+                    "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Виберіть дію нижче або введіть інший товар для пошуку.",
+                    product.get("name"),
+                    product.get("price"),
+                    product.get("category"),
+                    product.get("subcategory")
+            );
+
+            // 🔹 Створюємо клавіатуру
+            ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+            keyboardMarkup.setResizeKeyboard(true);
+            keyboardMarkup.setOneTimeKeyboard(false);
+
+            List<KeyboardRow> keyboard = new ArrayList<>();
+
+            KeyboardRow row1 = new KeyboardRow();
+            row1.add("🛒 Додати в кошик");
+            keyboard.add(row1);
+
+            KeyboardRow row2 = new KeyboardRow();
+            row2.add("🛍 Переглянути кошик");
+            keyboard.add(row2);
+
+            KeyboardRow row3 = new KeyboardRow();
+            row3.add("🔙 Назад");
+            keyboard.add(row3);
+
+            keyboardMarkup.setKeyboard(keyboard);
+
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(chatId);
+            sendMessage.setText(message);
+            sendMessage.setReplyMarkup(keyboardMarkup);
+
+            execute(sendMessage); // Відправляємо повідомлення
 
         } catch (Exception e) {
             e.printStackTrace();
             sendText(chatId, "⚠️ Помилка під час пошуку товару.");
         }
-    }
-
-    private void sendProductDetails(String chatId, Map<String, Object> product) throws TelegramApiException {
-        String message = String.format(
-                "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Якщо бажаєте, введіть інший товар для пошуку або натисніть 'Назад' для повернення в головне меню.",
-                product.get("name"),
-                product.get("price"),
-                product.get("category"),
-                product.get("subcategory")
-        );
-
-        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-        keyboardMarkup.setResizeKeyboard(true);
-        keyboardMarkup.setOneTimeKeyboard(false);
-
-        List<KeyboardRow> keyboard = new ArrayList<>();
-
-        KeyboardRow row1 = new KeyboardRow();
-        row1.add("➕ Додати в кошик");
-        keyboard.add(row1);
-
-        KeyboardRow row2 = new KeyboardRow();
-        row2.add("🛍 Переглянути кошик");
-        keyboard.add(row2);
-
-        KeyboardRow row3 = new KeyboardRow();
-        row3.add("🔙 Назад");
-        keyboard.add(row3);
-
-        keyboardMarkup.setKeyboard(keyboard);
-
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setChatId(chatId);
-        sendMessage.setText(message);
-        sendMessage.setReplyMarkup(keyboardMarkup);
-
-        execute(sendMessage);
     }
 
     // ✏️ Початок редагування товару для адміна
