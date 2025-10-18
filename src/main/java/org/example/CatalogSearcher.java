@@ -1,7 +1,8 @@
 package org.example;
+import org.yaml.snakeyaml.Yaml;
 
+import java.io.*;
 import java.sql.*;
-import java.util.*;
 
 import java.util.*;
 import java.util.List;                       // для List
@@ -10,8 +11,88 @@ import java.util.ArrayList;                  // для ArrayList
 
 public class CatalogSearcher {
 
+    private static final String CATALOG_PATH = "src/main/resources/catalog.yml";
     public CatalogSearcher() {
         System.out.println("✅ CatalogSearcher ready to query DB.");
+    }
+
+
+    public static List<Map<String, Object>> loadProducts() {
+        List<Map<String, Object>> products = new ArrayList<>();
+
+        try (InputStream input = new FileInputStream(CATALOG_PATH)) {
+            Yaml yaml = new Yaml();
+            Map<String, Object> data = yaml.load(input);
+
+            if (data != null && data.containsKey("products")) {
+                products = (List<Map<String, Object>>) data.get("products");
+                System.out.println("✅ Loaded " + products.size() + " products from catalog.yml");
+            } else {
+                System.out.println("⚠️ catalog.yml is empty or missing 'products' key");
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ Error loading catalog.yml: " + e.getMessage());
+        }
+
+        return products;
+    }
+
+    public List<Map<String, Object>> searchMixedFromYAML(String keyword) {
+        List<Map<String, Object>> results = new ArrayList<>();
+
+        // 1️⃣ Завантаження catalog.yml
+        List<Map<String, Object>> yamlProducts = new ArrayList<>();
+        try (InputStream input = new FileInputStream("src/main/resources/catalog.yml")) {
+            org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
+            Map<String, Object> data = yaml.load(input);
+            if (data != null && data.containsKey("products")) {
+                yamlProducts = (List<Map<String, Object>>) data.get("products");
+                System.out.println("✅ Loaded " + yamlProducts.size() + " products from catalog.yml");
+            } else {
+                System.out.println("⚠️ catalog.yml is empty or missing 'products' key");
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error loading catalog.yml: " + e.getMessage());
+        }
+
+        // 2️⃣ Фільтруємо по ключовому слову
+        yamlProducts.stream()
+                .filter(p -> p.get("name").toString().toLowerCase().contains(keyword.toLowerCase()))
+                .forEach(p -> {
+                    String name = p.get("name").toString();
+                    String price = p.get("price").toString();
+
+                    // 3️⃣ Отримуємо категорію та підкатегорію з MySQL
+                    String category = "❓";
+                    String subcategory = "❓";
+
+                    List<Map<String, Object>> dbMatches = findProductsByName(name);
+                    if (!dbMatches.isEmpty()) {
+                        Map<String, Object> match = dbMatches.get(0);
+                        category = match.get("category") != null ? match.get("category").toString() : "❓";
+                        subcategory = match.get("subcategory") != null ? match.get("subcategory").toString() : "❓";
+                    }
+
+                    // 4️⃣ Формуємо текст для Telegram
+                    String formattedText = String.format("""
+                        📦 %s
+                        💰 Ціна: %s грн за шт
+                        📂 %s → %s
+                        """, name, price, category, subcategory);
+
+                    // 5️⃣ Кладемо у Map для searchResults
+                    Map<String, Object> productMap = new HashMap<>();
+                    productMap.put("text", formattedText);
+                    productMap.put("name", name);
+                    productMap.put("price", price);
+                    productMap.put("category", category);
+                    productMap.put("subcategory", subcategory);
+
+                    results.add(productMap);
+                });
+
+        return results;
     }
 
     public List<Map<String, Object>> searchByKeywordsAdmin(String keywords) {
@@ -190,28 +271,60 @@ public class CatalogSearcher {
         return products;
     }
 
-    // ---------------- Всі продукти ----------------
-    public List<Map<String, Object>> getFlatProducts() {
-        List<Map<String, Object>> products = new ArrayList<>();
-        String sql = """
-            SELECT p.*, s.name AS subcategory, c.name AS category
-            FROM products p
-            JOIN subcategories s ON p.subcategory_id = s.id
-            JOIN categories c ON s.category_id = c.id
-            ORDER BY p.name;
-        """;
+    public List<String> searchMixed(String keyword) {
+        List<String> results = new ArrayList<>();
 
-        try (Connection conn = DatabaseManager.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+        try {
+            // 1️⃣ Завантажуємо продукти з catalog.yml
+            String catalogPath = "src/main/resources/catalog.yml";
+            org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
+            Map<String, Object> data;
 
-            while (rs.next()) products.add(mapProduct(rs));
+            try (InputStream input = new FileInputStream(catalogPath)) {
+                data = yaml.load(input);
+            }
 
-        } catch (SQLException e) {
+            if (data == null || !data.containsKey("products")) {
+                System.out.println("⚠️ catalog.yml is empty or missing 'products' key");
+                return results;
+            }
+
+            List<Map<String, Object>> yamlProducts = (List<Map<String, Object>>) data.get("products");
+
+            // 2️⃣ Фільтруємо по ключовому слову
+            yamlProducts.stream()
+                    .filter(p -> p.get("name").toString().toLowerCase().contains(keyword.toLowerCase()))
+                    .forEach(p -> {
+                        String name = p.get("name").toString();
+                        String price = p.get("price").toString();
+
+                        // 3️⃣ Отримуємо з MySQL підкатегорію/категорію
+                        String category = "❓";
+                        String subcategory = "❓";
+
+                        List<Map<String, Object>> dbMatches = findProductsByName(name);
+                        if (!dbMatches.isEmpty()) {
+                            Map<String, Object> match = dbMatches.get(0);
+                            category = match.get("category") != null ? match.get("category").toString() : "❓";
+                            subcategory = match.get("subcategory") != null ? match.get("subcategory").toString() : "❓";
+                        }
+
+                        // 4️⃣ Формуємо текст результату
+                        String formatted = String.format("""
+                        📦 %s
+                        💰 Ціна: %s грн за шт
+                        📂 %s → %s
+                        """, name, price, category, subcategory);
+
+                        results.add(formatted);
+                    });
+
+        } catch (Exception e) {
+            System.err.println("❌ Error in searchMixed: " + e.getMessage());
             e.printStackTrace();
         }
 
-        return products;
+        return results;
     }
 
     // ---------------- Допоміжний метод ----------------
