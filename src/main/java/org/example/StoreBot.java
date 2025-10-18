@@ -927,16 +927,20 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
     // 🔹 Додати в кошик
-    private void addToCart(Long chatId) throws TelegramApiException {
-        Map<String, Object> product = lastShownProduct.get(chatId);
+    private void addToCart(Long userId) {
+        Map<String, Object> product = lastShownProduct.get(userId);
 
         if (product == null) {
-            sendText(chatId, "❌ Неможливо додати товар. Спробуйте ще раз.");
+            sendText(String.valueOf(userId), "❌ Неможливо додати товар. Спробуйте ще раз.");
             return;
         }
 
-        userCart.computeIfAbsent(chatId, k -> new ArrayList<>()).add(product);
-        sendText(chatId, "✅ Товар \"" + product.get("name") + "\" додано до кошика!");
+        userCart.computeIfAbsent(userId, k -> new ArrayList<>()).add(product);
+        sendText(String.valueOf(userId),
+                "✅ Товар \"" + product.get("name") + "\" додано до кошика!\n🔎 Якщо бажаєте продовжити покупки, введіть назву наступного товару.");
+
+        // Тепер користувач може шукати далі
+        userStates.put(userId, "waiting_for_search");
     }
 
     private final UserManager userManager = new UserManager();
