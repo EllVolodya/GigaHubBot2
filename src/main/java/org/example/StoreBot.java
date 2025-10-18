@@ -1812,28 +1812,46 @@ public class StoreBot extends TelegramLongPollingBot {
     }
 
     private void handleWaitingForSearch(Long userId, String chatId, String text) {
-        String query = text.trim();
-        if (query.isEmpty()) {
+        text = text.trim();
+
+        // 1️⃣ Перевіряємо, чи текст — це число (вибір товару з попереднього списку)
+        if (text.matches("\\d+")) {
+            List<Map<String, Object>> products = searchResults.get(Long.parseLong(chatId));
+            if (products != null) {
+                int index = Integer.parseInt(text) - 1;
+                if (index >= 0 && index < products.size()) {
+                    Map<String, Object> product = products.get(index);
+                    lastShownProduct.put(Long.parseLong(chatId), product);
+                    sendProductDetailsWithButtons(chatId, product);
+                    searchResults.remove(Long.parseLong(chatId)); // очищаємо список після вибору
+                    return;
+                } else {
+                    sendText(chatId, "⚠️ Неправильний номер товару. Спробуйте ще раз.");
+                    return;
+                }
+            }
+        }
+
+        // 2️⃣ Якщо текст не число — виконуємо пошук по назві
+        if (text.isEmpty()) {
             sendText(chatId, "⚠️ Введіть назву товару для пошуку.");
             return;
         }
 
         try {
             CatalogSearcher searcher = new CatalogSearcher();
-            // Пошук у YAML + MySQL
-            List<Map<String, Object>> foundProducts = searcher.searchMixedFromYAML(query);
+            List<Map<String, Object>> foundProducts = searcher.searchMixedFromYAML(text);
 
             if (foundProducts.isEmpty()) {
                 sendText(chatId, "❌ Товар не знайдено. Спробуйте інший запит.");
                 return;
             }
 
-            // Якщо знайдено більше одного товару — показуємо список
             if (foundProducts.size() > 1) {
                 StringBuilder sb = new StringBuilder("🔎 Знайдено кілька товарів:\n\n");
-                int index = 1;
+                int idx = 1;
                 for (Map<String, Object> p : foundProducts) {
-                    sb.append(index++).append(". ").append(p.get("name")).append("\n");
+                    sb.append(idx++).append(". ").append(p.get("name")).append("\n");
                 }
                 sb.append("\nВведіть номер товару, щоб побачити деталі.");
 
@@ -1842,11 +1860,20 @@ public class StoreBot extends TelegramLongPollingBot {
                 return;
             }
 
-            // Якщо знайдено один товар — показуємо деталі з кнопками
+            // Якщо один товар
             Map<String, Object> product = foundProducts.get(0);
             lastShownProduct.put(Long.parseLong(chatId), product);
+            sendProductDetailsWithButtons(chatId, product);
 
-            // 🔹 Формуємо повідомлення
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendText(chatId, "⚠️ Помилка під час пошуку товару.");
+        }
+    }
+
+    // 🔹 Отправка деталей товару з кнопками
+    private void sendProductDetailsWithButtons(String chatId, Map<String, Object> product) {
+        try {
             String message = String.format(
                     "📦 %s\n💰 Ціна: %s грн за шт\n📂 %s → %s\n\n🔎 Виберіть дію нижче або введіть інший товар для пошуку.",
                     product.get("name"),
@@ -1855,7 +1882,6 @@ public class StoreBot extends TelegramLongPollingBot {
                     product.get("subcategory")
             );
 
-            // 🔹 Створюємо клавіатуру
             ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
             keyboardMarkup.setResizeKeyboard(true);
             keyboardMarkup.setOneTimeKeyboard(false);
@@ -1863,11 +1889,11 @@ public class StoreBot extends TelegramLongPollingBot {
             List<KeyboardRow> keyboard = new ArrayList<>();
 
             KeyboardRow row1 = new KeyboardRow();
-            row1.add("🛒 Додати в кошик");
+            row1.add("🛠 Додати в кошик");
             keyboard.add(row1);
 
             KeyboardRow row2 = new KeyboardRow();
-            row2.add("🛍 Переглянути кошик");
+            row2.add("🛒 Переглянути кошик");
             keyboard.add(row2);
 
             KeyboardRow row3 = new KeyboardRow();
@@ -1881,11 +1907,9 @@ public class StoreBot extends TelegramLongPollingBot {
             sendMessage.setText(message);
             sendMessage.setReplyMarkup(keyboardMarkup);
 
-            execute(sendMessage); // Відправляємо повідомлення
-
-        } catch (Exception e) {
+            execute(sendMessage);
+        } catch (TelegramApiException e) {
             e.printStackTrace();
-            sendText(chatId, "⚠️ Помилка під час пошуку товару.");
         }
     }
 
