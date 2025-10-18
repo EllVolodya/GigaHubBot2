@@ -41,19 +41,27 @@ public class CatalogSearcher {
     public List<Map<String, Object>> searchMixedFromYAML(String keyword) {
         List<Map<String, Object>> results = new ArrayList<>();
 
-        // 1️⃣ Завантаження catalog.yml
+        // 1️⃣ Завантаження catalog.yml через ClassLoader
         List<Map<String, Object>> yamlProducts = new ArrayList<>();
-        try (InputStream input = new FileInputStream("src/main/resources/catalog.yml")) {
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream("catalog.yml")) {
+            if (input == null) {
+                System.err.println("❌ catalog.yml not found in resources!");
+                return results;
+            }
+
             org.yaml.snakeyaml.Yaml yaml = new org.yaml.snakeyaml.Yaml();
             Map<String, Object> data = yaml.load(input);
+
             if (data != null && data.containsKey("products")) {
                 yamlProducts = (List<Map<String, Object>>) data.get("products");
                 System.out.println("✅ Loaded " + yamlProducts.size() + " products from catalog.yml");
             } else {
                 System.out.println("⚠️ catalog.yml is empty or missing 'products' key");
             }
+
         } catch (Exception e) {
             System.err.println("❌ Error loading catalog.yml: " + e.getMessage());
+            e.printStackTrace();
         }
 
         // 2️⃣ Фільтруємо по ключовому слову
